@@ -429,9 +429,87 @@ bool Update() {
 	// Procesa la entrada del teclado o mouse
 	processInput(window);
 
-	// Renderizado principal (pantalla)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	// 0) Picking: se dibuja ANTES de la escena visual para no sobreescribirla.
+	//    Se limpia color+depth, se renderiza con colores de ID, se lee el píxel
+	//    del centro y luego la escena visual normal pinta encima.
+	{
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // blanco = fondo
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glm::mat4 pickProjection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+		glm::mat4 pickView = camera.GetViewMatrix();
+
+		pickingShader->use();
+		pickingShader->setMat4("projection", pickProjection);
+		pickingShader->setMat4("view", pickView);
+
+		// Piso (ID 100)
+		{
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::scale(model, glm::vec3(20.0f, 20.0f, 20.0f));
+			pickingShader->setMat4("model", model);
+
+			int r = (oceanFloor->IDforPicking & 0x000000FF) >> 0;
+			int g = (oceanFloor->IDforPicking & 0x0000FF00) >> 8;
+			int b = (oceanFloor->IDforPicking & 0x00FF0000) >> 16;
+			pickingShader->setVec4("PickingColor", glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
+			oceanFloor->Draw(*pickingShader);
+		}
+
+		// Peces (IDs 201, 202, 203)
+		for (size_t i = 0; i < fishes.size(); ++i) {
+			FishOrbit& f = fishes[i];
+
+			float angle = animTime * f.speed + f.phase;
+			float x = cos(angle) * f.radius;
+			float z = sin(angle) * f.radius;
+			float y = f.height + sin(animTime * f.bobSpeed + f.phase) * f.bobAmp;
+
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(x, y, z));
+			float heading = atan2f(cos(angle), -sin(angle));
+			model = glm::rotate(model, heading, glm::vec3(0.0f, 1.0f, 0.0f));
+			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(f.scale, f.scale, f.scale));
+			pickingShader->setMat4("model", model);
+
+			int r = (f.pickingID & 0x000000FF) >> 0;
+			int g = (f.pickingID & 0x0000FF00) >> 8;
+			int b = (f.pickingID & 0x00FF0000) >> 16;
+			pickingShader->setVec4("PickingColor", glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
+			f.model->Draw(*pickingShader);
+		}
+
+		glUseProgram(0);
+
+		// Leer el píxel del centro (como en la práctica 13)
+		unsigned char data[4];
+		glReadPixels(SCR_WIDTH / 2, SCR_HEIGHT / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		unsigned int pickedID = data[0] + data[1] * 256 + data[2] * 256 * 256;
+
+		int newPicked = -1;
+		if (pickedID != 0x00ffffff) {
+			for (size_t i = 0; i < fishes.size(); ++i) {
+				if (fishes[i].pickingID == pickedID) {
+					newPicked = (int)i;
+					break;
+				}
+			}
+		}
+
+		// Solo imprimir cuando cambia la selección (evita spam cada frame)
+		if (newPicked != pickedFish) {
+			pickedFish = newPicked;
+			if (pickedFish >= 0)
+				std::cout << "Pez #" << (pickedFish + 1) << " seleccionado! (ID: " << pickedID << ")" << std::endl;
+			else if (pickedID == 100)
+				std::cout << "Piso del oceano seleccionado (ID: 100)" << std::endl;
+		}
+	}
+
+	// Renderizado principal (pantalla) - la escena visual pinta encima del picking
 	// Color de fondo azul profundo (mar)
 	glClearColor(0.0f, 0.15f, 0.35f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -575,82 +653,6 @@ bool Update() {
 	}
 
 	glUseProgram(0);
-
-	// 6) Picking: renderizar la escena con colores de ID y leer el píxel del centro
-	// (se ejecuta al final para no interferir con el render visual normal)
-	{
-		// Limpiar solo el buffer de color para el pase de picking
-		// (en la práctica 13 se hace un pase completo; aquí lo integramos)
-		glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // blanco = fondo
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		pickingShader->use();
-		pickingShader->setMat4("projection", projection);
-		pickingShader->setMat4("view", view);
-
-		// Piso (ID 100)
-		{
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::scale(model, glm::vec3(20.0f, 20.0f, 20.0f));
-			pickingShader->setMat4("model", model);
-
-			int r = (oceanFloor->IDforPicking & 0x000000FF) >> 0;
-			int g = (oceanFloor->IDforPicking & 0x0000FF00) >> 8;
-			int b = (oceanFloor->IDforPicking & 0x00FF0000) >> 16;
-			pickingShader->setVec4("PickingColor", glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
-			oceanFloor->Draw(*pickingShader);
-		}
-
-		// Peces (IDs 201, 202, 203)
-		for (size_t i = 0; i < fishes.size(); ++i) {
-			FishOrbit& f = fishes[i];
-
-			float angle = animTime * f.speed + f.phase;
-			float x = cos(angle) * f.radius;
-			float z = sin(angle) * f.radius;
-			float y = f.height + sin(animTime * f.bobSpeed + f.phase) * f.bobAmp;
-
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(x, y, z));
-			float heading = atan2f(cos(angle), -sin(angle));
-			model = glm::rotate(model, heading, glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(f.scale, f.scale, f.scale));
-			pickingShader->setMat4("model", model);
-
-			int r = (f.pickingID & 0x000000FF) >> 0;
-			int g = (f.pickingID & 0x0000FF00) >> 8;
-			int b = (f.pickingID & 0x00FF0000) >> 16;
-			pickingShader->setVec4("PickingColor", glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
-			f.model->Draw(*pickingShader);
-		}
-
-		glUseProgram(0);
-
-		// Leer el píxel del centro (como en la práctica 13)
-		unsigned char data[4];
-		glReadPixels(SCR_WIDTH / 2, SCR_HEIGHT / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-		unsigned int pickedID = data[0] + data[1] * 256 + data[2] * 256 * 256;
-
-		if (pickedID == 0x00ffffff) {
-			// Fondo - no hay selección
-			pickedFish = -1;
-		}
-		else {
-			// Buscar qué pez corresponde al ID
-			for (size_t i = 0; i < fishes.size(); ++i) {
-				if (fishes[i].pickingID == pickedID) {
-					pickedFish = (int)i;
-					std::cout << "Pez #" << (i + 1) << " seleccionado! (ID: " << pickedID << ")" << std::endl;
-					break;
-				}
-			}
-			if (pickedID == 100) {
-				std::cout << "Piso del oceano seleccionado (ID: 100)" << std::endl;
-				pickedFish = -1;
-			}
-		}
-	}
 
 	// glfw: swap buffers
 	glfwSwapBuffers(window);

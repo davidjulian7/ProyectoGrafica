@@ -1,0 +1,57 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+
+# Build results
+[Bb]uild/
+x64/
+x86/
+Win32/
+[Debug|Release]/
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.tlog
+*.log
+*.recipe
+*.iobj
+*.ipdb
+*.exp
+*.lib
+*.dll
+*.exe
+*.res
+*.pch
+*.sbr
+*.bsc
+*.aps
+
+# Excluir outputs de bin pero mantener assets
+bin/*.exe
+bin/*.pdb
+bin/*.ilk
+bin/*.idb
+bin/*.tlog
+bin/*.log
+bin/*.recipe
+bin/*.dll
+
+# Mantener DLLs de dependencias necesarias para ejecutar
+# (assimp, irrKlang se regeneran con build, pero si quieres evitar subirlos descomenta)
+# bin/assimp*.dll
+# bin/irrKlang.dll
+
+# Modelos de Blender temporales
+*.blend1
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini

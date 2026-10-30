@@ -84,7 +84,7 @@ ComputoGrafica/
 
 ## Equipo
 
-- [Tu nombre]
+- Muñoz Norberto David Julian
 - [Nombres de compañeros]
 
 ## Licencia

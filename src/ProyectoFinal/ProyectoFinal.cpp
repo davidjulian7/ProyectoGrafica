@@ -40,6 +40,9 @@
 #include <light.h>
 #include <cubemap.h>
 #include <particles.h>
+#include <menu.h>          // menú de inicio y HUD de zonas
+#include <zonas.h>         // contenido y render de las tres zonas
+#include <cmath>
 
 #include <irrKlang.h>
 using namespace irrklang;
@@ -56,9 +59,33 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+
+// Menú de inicio y zonas
+bool UpdateMenu();
+void EntrarZona(int zona);
+void VolverAlMenu();
 
 // Gobals
 GLFWwindow* window;
+
+// ---------------------------------------------------------------------------
+// Estados del programa: el menú de inicio y las tres zonas de inmersión
+// ---------------------------------------------------------------------------
+enum Estado { MENU = 0, ARRECIFES = 1, AGUAS_FRIAS = 2, NAUFRAGIOS = 3 };
+Estado estadoActual = MENU;
+const char* nombresZona[] = { "Menu", "Zona 1 - Arrecifes", "Zona 2 - Aguas Frias", "Zona 3 - Naufragios" };
+
+MenuInicio menuInicio;      // menú de inicio (include/menu.h)
+float zonaFade = 0.0f;      // fundido de entrada a una zona: 1 = negro, 0 = visible
+float zonaTiempo = 0.0f;    // segundos dentro de la zona actual
+
+Escenario escenario;        // zonas de inmersión (include/zonas.h)
+
+// --- Buzo: nado con inercia (etapa 1) ---
+glm::vec3 diverVelocity(0.0f);
+const float DIVER_ACCEL = 6.0f;   // qué tan rápido arranca al aletear
+const float DIVER_DRAG  = 2.5f;   // resistencia del agua (frena al soltar las teclas)
 
 // Tamaño en pixeles de la ventana
 const unsigned int SCR_WIDTH = 1024;
@@ -165,9 +192,14 @@ int main()
 	// Loop principal: primero el framebuffer del espejo, luego picking y render normal
 	while (!glfwWindowShouldClose(window))
 	{
-		if (!UpdateMirrorFramebuffer()) break;
-		if (!UpdatePickingProcess()) break;
-		if (!Update()) break;
+		if (estadoActual == MENU) {
+			// Menú de inicio: elegir una de las tres zonas
+			if (!UpdateMenu()) break;
+		}
+		else {
+			// Dentro de una zona: picking de la mira + render de la zona
+			if (!Update()) break;
+		}
 	}
 
 	glfwTerminate();
@@ -185,7 +217,7 @@ bool Start() {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	// Creación de la ventana con GLFW
-	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Proyecto Final - Mundo Submarino", NULL, NULL);
+	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Acuario Virtual Interactivo", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -197,6 +229,7 @@ bool Start() {
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetMouseButtonCallback(window, mouseButtonCallback);
+	glfwSetKeyCallback(window, key_callback);
 
 	// glad: Cargar todos los apuntadores
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -216,6 +249,10 @@ bool Start() {
 	mirrorShader = new Shader("shaders/14_mirror.vs", "shaders/14_mirror.fs");
 	pickingShader = new Shader("shaders/15_picking.vs", "shaders/15_picking.fs");
 
+	// Menú de inicio (shaders y texturas en shaders/menu_* y textures/menu/)
+	if (!menuInicio.Init())
+		std::cout << "[Menu] Se cargo con errores, revisa los mensajes anteriores." << std::endl;
+
 	// Modelos (PezPayaso.fbx está en models/)
 	oceanFloor = new Model("models/plane.fbx", 100);
 	fish01 = new Model("models/PezPayaso.fbx", 201);
@@ -228,18 +265,21 @@ bool Start() {
 	fishes.push_back({ 6.0f, -0.3f, 2.0f, 3.0f, 0.4f, 0.9f, 0.20f, 202, fish02 });
 	fishes.push_back({ 3.0f, 0.5f, 4.0f, 1.5f, 0.25f, 1.5f, 0.12f, 203, fish03 });
 
-	// Cubemap (fondo submarino - se puede sustituir por un cubemap azul/acuático)
+	// Cubemap submarino (generado proceduralmente; el 01 de las prácticas era un bosque)
 	vector<std::string> faces
 	{
-		"textures/cubemap/01/posx.png",
-		"textures/cubemap/01/negx.png",
-		"textures/cubemap/01/posy.png",
-		"textures/cubemap/01/negy.png",
-		"textures/cubemap/01/posz.png",
-		"textures/cubemap/01/negz.png"
+		"textures/cubemap/submarino/posx.png",
+		"textures/cubemap/submarino/negx.png",
+		"textures/cubemap/submarino/posy.png",
+		"textures/cubemap/submarino/negy.png",
+		"textures/cubemap/submarino/posz.png",
+		"textures/cubemap/submarino/negz.png"
 	};
 	mainCubeMap = new CubeMap();
 	mainCubeMap->loadCubemap(faces);
+
+	// Zonas de inmersión (los modelos de cada zona se cargan al entrar a ella)
+	escenario.Init(mainCubeMap->textureID);
 
 	// Configuración del sistema de partículas (burbujas que suben)
 	// gravedad negativa hacia arriba para simular flotabilidad
@@ -283,15 +323,21 @@ bool Start() {
 	// SoundEngine->play2D("sound/field.mp3", true);
 
 	std::cout << "============================================" << std::endl;
-	std::cout << "  PROYECTO FINAL - MUNDO SUBMARINO" << std::endl;
+	std::cout << "  ACUARIO VIRTUAL INTERACTIVO" << std::endl;
 	std::cout << "============================================" << std::endl;
-	std::cout << "Controles:" << std::endl;
-	std::cout << "  WASD     - Mover cámara" << std::endl;
-	std::cout << "  Mouse    - Rotar cámara" << std::endl;
-	std::cout << "  Click    - Seleccionar pez (picking)" << std::endl;
+	std::cout << "Menu de inicio:" << std::endl;
+	std::cout << "  1 / 2 / 3       - Entrar a una zona" << std::endl;
+	std::cout << "  Flechas + Enter - Navegar y entrar" << std::endl;
+	std::cout << "  Clic            - Entrar a la zona bajo el cursor" << std::endl;
+	std::cout << "Dentro de una zona:" << std::endl;
+	std::cout << "  WASD     - Nadar (Shift: aletear fuerte)" << std::endl;
+	std::cout << "  Espacio  - Subir      Ctrl / C - Bajar" << std::endl;
+	std::cout << "  Mouse    - Mirar alrededor" << std::endl;
+	std::cout << "  Click    - Interactuar con lo que apunta la mira" << std::endl;
+	std::cout << "  F        - Linterna" << std::endl;
 	std::cout << "  M/N/B    - Wireframe / Fill / Points" << std::endl;
 	std::cout << "  F1       - Activar sonido ambiental" << std::endl;
-	std::cout << "  ESC      - Salir" << std::endl;
+	std::cout << "  ESC      - Volver al menu (en el menu: salir)" << std::endl;
 	std::cout << "============================================" << std::endl;
 
 	return true;
@@ -412,252 +458,45 @@ bool UpdatePickingProcess()
 // Render principal de la escena
 // ---------------------------------------------------------------------------
 bool Update() {
-	// Cálculo del framerate
+	// Tiempo entre cuadros
 	float currentFrame = (float)glfwGetTime();
 	deltaTime = currentFrame - lastFrame;
 	lastFrame = currentFrame;
-
-	// Acumulamos tiempo para animaciones
 	animTime += deltaTime;
+	zonaTiempo += deltaTime;
 
-	elapsedTime += deltaTime;
-	if (elapsedTime > 1.0f / 30.0f) {
-		elapsedTime = 0.0f;
-		bubbles.UpdatePhysics(deltaTime);
-	}
-
-	// Procesa la entrada del teclado o mouse
+	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
 	processInput(window);
+	escenario.Actualizar(deltaTime, animTime, camera);
 
+	// Vaivén de la vista: respiración siempre presente + aleteo al nadar
+	float nado = glm::length(diverVelocity);
+	camera.BobOffset = glm::vec3(0.0f, sinf(animTime * 1.3f) * 0.04f + sinf(animTime * 4.0f) * 0.02f * nado, 0.0f);
+
+	int fbW, fbH;
+	glfwGetFramebufferSize(window, &fbW, &fbH);
+	if (fbW == 0 || fbH == 0) { glfwPollEvents(); return true; }   // ventana minimizada
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	// 0) Picking: se dibuja ANTES de la escena visual para no sobreescribirla.
-	//    Se limpia color+depth, se renderiza con colores de ID, se lee el píxel
-	//    del centro y luego la escena visual normal pinta encima.
-	{
-		glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // blanco = fondo
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		glm::mat4 pickProjection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
-		glm::mat4 pickView = camera.GetViewMatrix();
-
-		pickingShader->use();
-		pickingShader->setMat4("projection", pickProjection);
-		pickingShader->setMat4("view", pickView);
-
-		// Piso (ID 100)
-		{
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::scale(model, glm::vec3(20.0f, 20.0f, 20.0f));
-			pickingShader->setMat4("model", model);
-
-			int r = (oceanFloor->IDforPicking & 0x000000FF) >> 0;
-			int g = (oceanFloor->IDforPicking & 0x0000FF00) >> 8;
-			int b = (oceanFloor->IDforPicking & 0x00FF0000) >> 16;
-			pickingShader->setVec4("PickingColor", glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
-			oceanFloor->Draw(*pickingShader);
-		}
-
-		// Peces (IDs 201, 202, 203)
-		for (size_t i = 0; i < fishes.size(); ++i) {
-			FishOrbit& f = fishes[i];
-
-			float angle = animTime * f.speed + f.phase;
-			float x = cos(angle) * f.radius;
-			float z = sin(angle) * f.radius;
-			float y = f.height + sin(animTime * f.bobSpeed + f.phase) * f.bobAmp;
-
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(x, y, z));
-			float heading = atan2f(cos(angle), -sin(angle));
-			model = glm::rotate(model, heading, glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(f.scale, f.scale, f.scale));
-			pickingShader->setMat4("model", model);
-
-			int r = (f.pickingID & 0x000000FF) >> 0;
-			int g = (f.pickingID & 0x0000FF00) >> 8;
-			int b = (f.pickingID & 0x00FF0000) >> 16;
-			pickingShader->setVec4("PickingColor", glm::vec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
-			f.model->Draw(*pickingShader);
-		}
-
-		glUseProgram(0);
-
-		// Leer el píxel del centro (como en la práctica 13)
-		unsigned char data[4];
-		glReadPixels(SCR_WIDTH / 2, SCR_HEIGHT / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-		unsigned int pickedID = data[0] + data[1] * 256 + data[2] * 256 * 256;
-
-		int newPicked = -1;
-		if (pickedID != 0x00ffffff) {
-			for (size_t i = 0; i < fishes.size(); ++i) {
-				if (fishes[i].pickingID == pickedID) {
-					newPicked = (int)i;
-					break;
-				}
-			}
-		}
-
-		// Solo imprimir cuando cambia la selección (evita spam cada frame)
-		if (newPicked != pickedFish) {
-			pickedFish = newPicked;
-			if (pickedFish >= 0)
-				std::cout << "Pez #" << (pickedFish + 1) << " seleccionado! (ID: " << pickedID << ")" << std::endl;
-			else if (pickedID == 100)
-				std::cout << "Piso del oceano seleccionado (ID: 100)" << std::endl;
-		}
-	}
-
-	// Renderizado principal (pantalla) - la escena visual pinta encima del picking
-	// Color de fondo azul profundo (mar)
-	glClearColor(0.0f, 0.15f, 0.35f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+	glViewport(0, 0, fbW, fbH);
+	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
 	glm::mat4 view = camera.GetViewMatrix();
 
-	// 1) Cubemap (fondo submarino)
-	{
-		mainCubeMap->drawCubeMap(*cubemapShader, projection, view);
-	}
+	// 1) Picking: qué hay en el centro de la pantalla (la mira del buzo)
+	escenario.Picking(projection, view, animTime, fbW, fbH);
 
-	// 2) Piso del océano con efecto espejo (reflexión)
-	{
-		mirrorShader->use();
+	// 2) Escena de la zona: agua, terreno, fauna, superficie y burbujas
+	escenario.Dibujar(projection, view, camera, animTime, fbW, fbH);
 
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		mirrorShader->setMat4("projection", projection);
-		mirrorShader->setMat4("view", view);
-
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-		model = glm::rotate(model, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(20.0f, 20.0f, 20.0f)); // piso grande
-		mirrorShader->setMat4("model", model);
-
-		oceanFloor->DrawMirror(*mirrorShader);
-	}
+	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
+	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo);
+	const Elemento* sel = escenario.Seleccionado();
+	menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura);
+	zonaFade = zonaFade - deltaTime * 1.4f;
+	if (zonaFade < 0.0f) zonaFade = 0.0f;
 
 	glUseProgram(0);
-
-	// 3) Peces con iluminación Phong de múltiples luces
-	{
-		mLightsShader->use();
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		mLightsShader->setMat4("projection", projection);
-		mLightsShader->setMat4("view", view);
-
-		// Configuramos propiedades de fuentes de luz
-		mLightsShader->setInt("numLights", (int)gLights.size());
-		for (size_t i = 0; i < gLights.size(); ++i) {
-			SetLightUniformVec3(mLightsShader, "Position", i, gLights[i].Position);
-			SetLightUniformVec3(mLightsShader, "Direction", i, gLights[i].Direction);
-			SetLightUniformVec4(mLightsShader, "Color", i, gLights[i].Color);
-			SetLightUniformVec4(mLightsShader, "Power", i, gLights[i].Power);
-			SetLightUniformInt(mLightsShader, "alphaIndex", i, gLights[i].alphaIndex);
-			SetLightUniformFloat(mLightsShader, "distance", i, gLights[i].distance);
-		}
-
-		mLightsShader->setVec3("eye", camera.Position);
-
-		// Material de los peces
-		mLightsShader->setVec4("MaterialAmbientColor", fishMaterial.ambient);
-		mLightsShader->setVec4("MaterialDiffuseColor", fishMaterial.diffuse);
-		mLightsShader->setVec4("MaterialSpecularColor", fishMaterial.specular);
-		mLightsShader->setFloat("transparency", fishMaterial.transparency);
-
-		// Dibujamos cada pez con animación orbital
-		for (size_t i = 0; i < fishes.size(); ++i) {
-			FishOrbit& f = fishes[i];
-
-			float angle = animTime * f.speed + f.phase;
-			float x = cos(angle) * f.radius;
-			float z = sin(angle) * f.radius;
-			float y = f.height + sin(animTime * f.bobSpeed + f.phase) * f.bobAmp;
-
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(x, y, z));
-
-			// Rotación para que el pez mire en la dirección del movimiento (tangente a la órbita)
-			float heading = atan2f(cos(angle), -sin(angle));
-			model = glm::rotate(model, heading, glm::vec3(0.0f, 1.0f, 0.0f));
-			// Los FBX suelen venir rotados -90° en X
-			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-			// Si el pez está seleccionado, hacerlo un poco más grande (feedback visual)
-			float s = f.scale;
-			if ((int)i == pickedFish) s *= 1.3f;
-			model = glm::scale(model, glm::vec3(s, s, s));
-
-			mLightsShader->setMat4("model", model);
-			f.model->Draw(*mLightsShader);
-		}
-	}
-
-	glUseProgram(0);
-
-	// 4) Superficie del agua con efecto Fresnel (transparencia/refracción)
-	{
-		fresnelShader->use();
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		fresnelShader->setMat4("projection", projection);
-		fresnelShader->setMat4("view", view);
-
-		// Plano del agua en la parte superior (Y alto) simulando la superficie
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 10.0f, 0.0f));
-		model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(30.0f, 30.0f, 1.0f));
-		fresnelShader->setMat4("model", model);
-		fresnelShader->setVec3("cameraPosition", camera.Position);
-		fresnelShader->setFloat("mRefractionRatio", 1.0f / 1.333f); // 1.333 Agua
-		fresnelShader->setFloat("_Bias", 0.02f);
-		fresnelShader->setFloat("_Scale", 0.5f);
-		fresnelShader->setFloat("_Power", 2.0f);
-
-		// Usamos el piso como geometría del plano del agua (es un plano)
-		// Nota: si plane.fbx tiene textura se mezclará; el efecto Fresnel domina
-		oceanFloor->Draw(*fresnelShader);
-	}
-
-	glUseProgram(0);
-
-	// 5) Partículas: burbujas subiendo
-	{
-		particlesShader->use();
-		particlesShader->setMat4("projection", projection);
-		particlesShader->setMat4("view", view);
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		for (int psc = 0; psc < (int)bubbles.particles.size(); psc++) {
-			Particle p_i = bubbles.particles.at(psc);
-
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, p_i.position);
-			model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
-
-			particlesShader->setMat4("model", model);
-			bubbleModel->Draw(*particlesShader);
-		}
-	}
-
-	glUseProgram(0);
-
-	// glfw: swap buffers
 	glfwSwapBuffers(window);
 	glfwPollEvents();
-
 	return true;
 }
 
@@ -666,17 +505,35 @@ bool Update() {
 // ---------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-		glfwSetWindowShouldClose(window, true);
+	// Esc se maneja en key_callback (volver al menú / salir)
 
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera.ProcessKeyboard(FORWARD, deltaTime);
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera.ProcessKeyboard(LEFT, deltaTime);
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera.ProcessKeyboard(RIGHT, deltaTime);
+	// Nado del buzo: las teclas empujan una velocidad y el agua la frena poco a poco
+	glm::vec3 wish(0.0f);
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) wish += camera.Front;
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) wish -= camera.Front;
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) wish -= camera.Right;
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) wish += camera.Right;
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) wish.y += 1.0f;          // subir
+	if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+	    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) wish.y -= 1.0f;                // bajar
+	if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
+	float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.2f : 1.0f;
+
+	diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
+	diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
+	camera.Position += diverVelocity * deltaTime;
+
+	// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
+	float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.0f;
+	if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
+	float techo = escenario.cfg.superficieY - 0.6f;
+	if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
+	glm::vec2 xz(camera.Position.x, camera.Position.z);
+	if (glm::length(xz) > 42.0f) {
+		xz = glm::normalize(xz) * 42.0f;
+		camera.Position.x = xz.x; camera.Position.z = xz.y;
+	}
+
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
@@ -700,6 +557,15 @@ void processInput(GLFWwindow* window)
 // ---------------------------------------------------------------------------
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
+	if (estadoActual == MENU) {
+		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+			menuInicio.OnClick();
+		return;
+	}
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		escenario.Interactuar();   // recoger basura o ver el nombre del animal
+		return;
+	}
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		// El picking se procesa en Update() leyendo el píxel central.
 		// Aquí solo imprimimos confirmación si hay un pez seleccionado.
@@ -719,6 +585,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
+	// En el menú el ratón no gira la cámara (el menú lee el cursor por su cuenta)
+	if (estadoActual == MENU) {
+		firstMouse = true;
+		return;
+	}
+
 	if (firstMouse)
 	{
 		lastX = (float)xpos;
@@ -737,5 +609,83 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
+	if (estadoActual == MENU) return;
 	camera.ProcessMouseScroll((float)yoffset);
+}
+
+// ---------------------------------------------------------------------------
+// Teclado por eventos: una pulsación = una acción (no se repite al mantener)
+// ---------------------------------------------------------------------------
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	if (action != GLFW_PRESS) return;
+
+	if (estadoActual == MENU) {
+		if (key == GLFW_KEY_ESCAPE)
+			glfwSetWindowShouldClose(window, true);
+		else
+			menuInicio.OnKey(key);
+		return;
+	}
+
+	// Dentro de una zona: Esc regresa al menú de inicio, F enciende/apaga la linterna
+	if (key == GLFW_KEY_ESCAPE)
+		VolverAlMenu();
+	else if (key == GLFW_KEY_F) {
+		escenario.linterna = !escenario.linterna;
+		std::cout << (escenario.linterna ? ">> Linterna encendida" : ">> Linterna apagada") << std::endl;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Menú de inicio
+// ---------------------------------------------------------------------------
+bool UpdateMenu()
+{
+	float currentFrame = (float)glfwGetTime();
+	deltaTime = currentFrame - lastFrame;
+	lastFrame = currentFrame;
+
+	int zona = menuInicio.Update(window, deltaTime);
+	menuInicio.Draw(window, currentFrame);
+
+	glfwSwapBuffers(window);
+	glfwPollEvents();
+
+	if (zona > 0)
+		EntrarZona(zona);
+	return true;
+}
+
+void EntrarZona(int zona)
+{
+	estadoActual = (Estado)zona;
+
+	// Carga la zona (la primera vez lee sus modelos) y coloca al buzo en su punto de inicio
+	escenario.Entrar(zona, camera);
+	diverVelocity = glm::vec3(0.0f);
+	firstMouse = true;
+	pickedFish = -1;
+	zonaTiempo = 0.0f;
+	lastFrame = (float)glfwGetTime();   // la carga no cuenta como tiempo de nado
+
+	// El cursor desaparece: el centro de la pantalla es la mira del buzo
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	zonaFade = 1.0f;   // la zona aparece desde negro
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	std::string titulo = std::string("Acuario Virtual Interactivo - ") + nombresZona[zona];
+	glfwSetWindowTitle(window, titulo.c_str());
+	std::cout << ">> Entrando a " << nombresZona[zona] << " (Esc para volver al menu)" << std::endl;
+}
+
+void VolverAlMenu()
+{
+	estadoActual = MENU;
+	menuInicio.Reiniciar();
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glfwSetWindowTitle(window, "Acuario Virtual Interactivo");
+	std::cout << ">> Menu de inicio" << std::endl;
 }

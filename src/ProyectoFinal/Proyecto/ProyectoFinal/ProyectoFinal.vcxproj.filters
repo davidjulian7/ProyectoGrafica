@@ -5,6 +5,10 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{6A1E4C2B-3D5F-4E7A-9B8C-1D2E3F4A5B6C}</UniqueIdentifier>
+      <Extensions>vs;fs;glsl</Extensions>
+    </Filter>
     <Filter Include="Encabezados">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
@@ -17,5 +21,23 @@
     <ClCompile Include="..\..\stb_image.cpp">
       <Filter>Fuentes</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\menu.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\camera.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\modelstructs.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\model.h"><Filter>Encabezados</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\bin\shaders\menu_fondo.vs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\menu_fondo.fs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\menu_ui.vs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\menu_ui.fs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona.vs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona.fs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona_fondo.fs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona_superficie.vs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona_superficie.fs"><Filter>Shaders</Filter></None>
   </ItemGroup>
 </Project>

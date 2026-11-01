@@ -55,3 +55,10 @@ bin/*.dll
 # Windows
 Thumbs.db
 desktop.ini
+
+# Visual Studio (archivos de compilacion)
+.vs/
+x64/
+*.obj
+*.pch
+*.vcxproj.user

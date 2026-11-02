@@ -14,6 +14,9 @@ uniform float uEmision;
 uniform float uResaltado;   // brillo del objeto bajo la mira
 uniform float uBlanqueo;    // 0..1 coral sano -> blanqueado (Zona 1)
 uniform float uFantasma;    // 0..1 animal real -> fantasma (Zona 2)
+uniform float uSpecPower;   // potencia especular (opaco bajo, plástico medio, metal alto)
+uniform float uSpecInt;     // intensidad especular
+uniform float uMetalico;    // 0..1: 1 = brillo tintado por la textura
 
 uniform vec3  uCamPos;
 uniform vec3  uSolDir;
@@ -66,10 +69,12 @@ void main()
     float dif = max(dot(N, L), 0.0);
     float caus = uCausticas * causticas(vPosMundo.xz, uTiempo) * max(N.y, 0.0);
     vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), 40.0) * 0.25;
+    vec3 F0 = mix(vec3(0.04), base, uMetalico);   // dieléctrico vs metal
+    float spec = pow(max(dot(N, H), 0.0), uSpecPower) * uSpecInt;
+    vec3 specC = F0 * spec;
     vec3 amb = mix(uAmbAbajo, uAmbArriba, N.y * 0.5 + 0.5);
 
-    vec3 color = base * (amb + uSolColor * absorcion * (dif * 0.85 + caus * 1.6)) + uSolColor * absorcion * spec;
+    vec3 color = base * (amb + uSolColor * absorcion * (dif * 0.85 + caus * 1.6)) + uSolColor * absorcion * specC;
 
     if (uLinterna == 1) {
         vec3 Lf = uLinternaPos - vPosMundo;

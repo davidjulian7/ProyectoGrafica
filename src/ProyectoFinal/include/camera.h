@@ -62,7 +62,7 @@ public:
     }
 
     // Returns the view matrix calculated using Euler Angles and the LookAt Matrix
-    glm::mat4 GetViewMatrix()
+    glm::mat4 GetViewMatrix() const
     {
         glm::vec3 eye = Position + BobOffset;
         return glm::lookAt(eye, eye + Front, Up);

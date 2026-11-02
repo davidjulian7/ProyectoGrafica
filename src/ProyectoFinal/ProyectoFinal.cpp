@@ -95,6 +95,11 @@ const unsigned int SCR_HEIGHT = 768;
 Camera camera(glm::vec3(0.0f, 3.0f, 12.0f));
 Camera mirrorCamera(glm::vec3(0.0f, 0.0f, 0.0f));
 
+// Segunda cámara: órbita detrás del buzo (tecla V)
+bool  modoOrbita = false;
+float orbitDist  = 6.0f;                 // rango 3..20 (scroll)
+Camera cameraOrbita(glm::vec3(0.0f, 3.0f, 18.0f));
+
 // Controladores para el movimiento del mouse
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -333,7 +338,9 @@ bool Start() {
 	std::cout << "  WASD     - Nadar (Shift: aletear fuerte)" << std::endl;
 	std::cout << "  Espacio  - Subir      Ctrl / C - Bajar" << std::endl;
 	std::cout << "  Mouse    - Mirar alrededor" << std::endl;
+	std::cout << "  V        - Camara en orbita (rueda: distancia)" << std::endl;
 	std::cout << "  Click    - Interactuar con lo que apunta la mira" << std::endl;
+	std::cout << "  E        - Modo edicion de objetos (Tab: ciclar, F5: guardar pose)" << std::endl;
 	std::cout << "  F        - Linterna" << std::endl;
 	std::cout << "  M/N/B    - Wireframe / Fill / Points" << std::endl;
 	std::cout << "  F1       - Activar sonido ambiental" << std::endl;
@@ -473,19 +480,35 @@ bool Update() {
 	float nado = glm::length(diverVelocity);
 	camera.BobOffset = glm::vec3(0.0f, sinf(animTime * 1.3f) * 0.04f + sinf(animTime * 4.0f) * 0.02f * nado, 0.0f);
 
+	// Cámara activa: FP del buzo u órbita que lo persigue por detrás
+	const Camera* camVista = &camera;
+	if (modoOrbita) {
+		glm::vec3 objetivo = camera.Position + camera.Front * 2.0f;
+		glm::vec3 pos = objetivo - camera.Front * orbitDist + glm::vec3(0.0f, 1.2f, 0.0f);
+		float suelo = escenario.AlturaSuelo(pos.x, pos.z) + 0.5f;
+		if (pos.y < suelo) pos.y = suelo;
+		cameraOrbita.Position = pos;
+		cameraOrbita.Front = glm::normalize(objetivo - pos);
+		cameraOrbita.Right = glm::normalize(glm::cross(cameraOrbita.Front, cameraOrbita.WorldUp));
+		cameraOrbita.Up = glm::normalize(glm::cross(cameraOrbita.Right, cameraOrbita.Front));
+		cameraOrbita.Zoom = 50.0f;
+		camVista = &cameraOrbita;
+	}
+
 	int fbW, fbH;
 	glfwGetFramebufferSize(window, &fbW, &fbH);
 	if (fbW == 0 || fbH == 0) { glfwPollEvents(); return true; }   // ventana minimizada
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, fbW, fbH);
-	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
-	glm::mat4 view = camera.GetViewMatrix();
+	glm::mat4 projection = glm::perspective(glm::radians(camVista->Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
+	glm::mat4 view = camVista->GetViewMatrix();
 
 	// 1) Picking: qué hay en el centro de la pantalla (la mira del buzo)
 	escenario.Picking(projection, view, animTime, fbW, fbH);
 
 	// 2) Escena de la zona: agua, terreno, fauna, superficie y burbujas
-	escenario.Dibujar(projection, view, camera, animTime, fbW, fbH);
+	//    camVista gobierna la vista; la linterna sigue atada al buzo (camera FP)
+	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera);
 
 	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo);
@@ -508,30 +531,66 @@ void processInput(GLFWwindow* window)
 	// Esc se maneja en key_callback (volver al menú / salir)
 
 	// Nado del buzo: las teclas empujan una velocidad y el agua la frena poco a poco
-	glm::vec3 wish(0.0f);
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) wish += camera.Front;
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) wish -= camera.Front;
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) wish -= camera.Right;
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) wish += camera.Right;
-	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) wish.y += 1.0f;          // subir
-	if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-	    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) wish.y -= 1.0f;                // bajar
-	if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
-	float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.2f : 1.0f;
+	// En modo edición (E) WASD mueven el objeto seleccionado, no al buzo
+	if (escenario.modoEdicion) {
+		Elemento* ed = escenario.Editable();
+		if (ed) {
+			float velObj = 4.0f * deltaTime;
+			float velRot = 60.0f * deltaTime;
+			// Movimiento relativo al plano horizontal de la cámara
+			glm::vec3 fwd = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
+			glm::vec3 rgt = glm::normalize(glm::vec3(camera.Right.x, 0.0f, camera.Right.z));
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) ed->pos += fwd * velObj;
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) ed->pos -= fwd * velObj;
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) ed->pos -= rgt * velObj;
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) ed->pos += rgt * velObj;
+			if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) ed->pos.y += velObj;
+			if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+			    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) ed->pos.y -= velObj;
+			// Escala con - / =  (o +)
+			if (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS) {
+				ed->escala -= 0.5f * deltaTime;
+				if (ed->escala < 0.05f) ed->escala = 0.05f;
+			}
+			if (glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS) ed->escala += 0.5f * deltaTime;
+			// Rotación en Y con Q / E... E es el toggle; usar Q y R
+			if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) ed->yaw += velRot;
+			if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) ed->yaw -= velRot;
+			// Rotación extra en X/Z con 1..4 / 7..0 (opcionales)
+			if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) ed->rotExtra.x += velRot;
+			if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) ed->rotExtra.x -= velRot;
+			if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS) ed->rotExtra.z += velRot;
+			if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) ed->rotExtra.z -= velRot;
+			// Objeto sobre el suelo: la altura se mide desde el terreno en la nueva (x,z)
+			if (ed->sobreSuelo) ed->baseY = escenario.AlturaSuelo(ed->pos.x, ed->pos.z);
+		}
+	}
+	else {
+		glm::vec3 wish(0.0f);
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) wish += camera.Front;
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) wish -= camera.Front;
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) wish -= camera.Right;
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) wish += camera.Right;
+		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) wish.y += 1.0f;          // subir
+		if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+		    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) wish.y -= 1.0f;                // bajar
+		if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
+		float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.2f : 1.0f;
 
-	diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
-	diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
-	camera.Position += diverVelocity * deltaTime;
+		diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
+		diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
+		camera.Position += diverVelocity * deltaTime;
 
-	// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
-	float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.0f;
-	if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
-	float techo = escenario.cfg.superficieY - 0.6f;
-	if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
-	glm::vec2 xz(camera.Position.x, camera.Position.z);
-	if (glm::length(xz) > 42.0f) {
-		xz = glm::normalize(xz) * 42.0f;
-		camera.Position.x = xz.x; camera.Position.z = xz.y;
+		// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
+		float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.0f;
+		if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
+		float techo = escenario.cfg.superficieY - 0.6f;
+		if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
+		glm::vec2 xz(camera.Position.x, camera.Position.z);
+		if (glm::length(xz) > 42.0f) {
+			xz = glm::normalize(xz) * 42.0f;
+			camera.Position.x = xz.x; camera.Position.z = xz.y;
+		}
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
@@ -564,6 +623,9 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 	}
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		escenario.Interactuar();   // recoger basura o ver el nombre del animal
+		// En modo edición, el clic también fija el objeto a editar
+		if (escenario.modoEdicion)
+			escenario.FijarEditableDesdeSeleccion();
 		return;
 	}
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
@@ -610,7 +672,12 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	if (estadoActual == MENU) return;
-	camera.ProcessMouseScroll((float)yoffset);
+	if (modoOrbita) {
+		orbitDist -= (float)yoffset * 0.5f;
+		if (orbitDist < 3.0f) orbitDist = 3.0f;
+		if (orbitDist > 20.0f) orbitDist = 20.0f;
+	}
+	else camera.ProcessMouseScroll((float)yoffset);
 }
 
 // ---------------------------------------------------------------------------
@@ -634,6 +701,32 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	else if (key == GLFW_KEY_F) {
 		escenario.linterna = !escenario.linterna;
 		std::cout << (escenario.linterna ? ">> Linterna encendida" : ">> Linterna apagada") << std::endl;
+	}
+	else if (key == GLFW_KEY_V) {
+		modoOrbita = !modoOrbita;
+		firstMouse = true;
+		std::cout << (modoOrbita
+			? ">> Camara en orbita (rueda: distancia, V: volver a 1a persona)"
+			: ">> Camara en 1a persona") << std::endl;
+	}
+	// --- Modo edición de objetos (A3) ---
+	else if (key == GLFW_KEY_E) {
+		escenario.modoEdicion = !escenario.modoEdicion;
+		if (escenario.modoEdicion) {
+			escenario.FijarEditableDesdeSeleccion();
+			std::cout << ">> MODO EDICION ON\n"
+				"   WASD/Space/Ctrl: mover | -/=: escala | Q/R: rotar Y | 1-4: rotar X/Z\n"
+				"   Tab: siguiente objeto | F5: guardar pose | E: salir" << std::endl;
+		}
+		else {
+			std::cout << ">> MODO EDICION OFF" << std::endl;
+		}
+	}
+	else if (escenario.modoEdicion && key == GLFW_KEY_TAB) {
+		escenario.CiclarEditable();
+	}
+	else if (escenario.modoEdicion && key == GLFW_KEY_F5) {
+		escenario.GuardarPoseActual();
 	}
 }
 
@@ -667,6 +760,10 @@ void EntrarZona(int zona)
 	firstMouse = true;
 	pickedFish = -1;
 	zonaTiempo = 0.0f;
+	modoOrbita = false;
+	orbitDist = 6.0f;
+	escenario.modoEdicion = false;
+	escenario.editIdx = -1;
 	lastFrame = (float)glfwGetTime();   // la carga no cuenta como tiempo de nado
 
 	// El cursor desaparece: el centro de la pantalla es la mira del buzo
@@ -684,6 +781,10 @@ void VolverAlMenu()
 {
 	estadoActual = MENU;
 	menuInicio.Reiniciar();
+	modoOrbita = false;
+	orbitDist = 6.0f;
+	escenario.modoEdicion = false;
+	escenario.editIdx = -1;
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glfwSetWindowTitle(window, "Acuario Virtual Interactivo");

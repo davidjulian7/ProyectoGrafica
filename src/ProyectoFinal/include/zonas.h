@@ -33,7 +33,6 @@
 #include <model.h>
 #include <camera.h>
 #include <keyframes.h>
-#include <animatedmodel.h>   // tras shader_m.h (guard SHADER_H compartido)
 
 enum TipoMov {
     MOV_FIJO,       // quieto (puede flotar suavemente con oscAmp)
@@ -117,9 +116,6 @@ public:
         shFondo = new Shader("shaders/menu_fondo.vs", "shaders/zona_fondo.fs");
         shSuperficie = new Shader("shaders/zona_superficie.vs", "shaders/zona_superficie.fs");
         shPicking = new Shader("shaders/15_picking.vs", "shaders/15_picking.fs");
-        // Demo de skinning (rubrica A2b): solo se usa en Zona 1
-        shSkin = new Shader("shaders/10_vertex_skinning-IT.vs", "shaders/10_fragment_skinning-IT.fs");
-        shSkin->setBonesIDs(MAX_RIGGING_BONES);
         glGenVertexArrays(1, &vaoVacio);
         // cuadrado de 1x1 en el plano XZ para la superficie del agua
         float q[] = { -0.5f,0,-0.5f,  0.5f,0,-0.5f,  0.5f,0,0.5f,  -0.5f,0,-0.5f,  0.5f,0,0.5f,  -0.5f,0,0.5f };
@@ -155,21 +151,6 @@ public:
         burbujaModelo = Cargar("burbuja", "comun");
         for (auto& f : fuentes) f.y += AlturaSuelo(f.x, f.z);   // las fuentes se miden desde el fondo
         linterna = cfg.linterna;
-
-        // Demo de skinning: solo en Zona 1 (se carga una vez)
-        if (z == 1) {
-            if (!demoSkin) {
-                demoSkin = new AnimatedModel("models/IllumModels/KAYA.fbx");
-                if (demoSkin->meshes.empty()) {
-                    delete demoSkin; demoSkin = nullptr;
-                    std::cout << "[Zonas] No se pudo cargar KAYA.fbx (demo skinning)" << std::endl;
-                }
-            }
-            if (demoSkin) {
-                demoPos = glm::vec3(-4.0f, AlturaSuelo(-4.0f, 12.0f), 12.0f);
-                demoYaw = 140.0f;
-            }
-        }
 
         cam.Position = cfg.inicioCamara;
         cam.Yaw = cfg.inicioYaw; cam.Pitch = -5.0f; cam.Zoom = ZOOM;
@@ -218,8 +199,6 @@ public:
             if (b.p.y > cfg.superficieY - 0.05f) { burbujas[i] = burbujas.back(); burbujas.pop_back(); }
             else i++;
         }
-        // Demo skinning (solo Zona 1)
-        if (demoSkin && zona == 1) demoSkin->UpdateAnimation(dt);
     }
 
     // Pase de picking: dibuja los elementos interactivos con su color de ID y lee el centro.
@@ -377,22 +356,6 @@ public:
             DibujarElemento(e, (int)i, t);
         }
 
-        // 2b) Demo de skinning (Zona 1): esqueleto + shader de huesos
-        if (demoSkin && zona == 1 && shSkin) {
-            shSkin->use();
-            shSkin->setMat4("projection", proj);
-            shSkin->setMat4("view", view);
-            glm::mat4 mDemo = glm::translate(glm::mat4(1.0f), demoPos);
-            mDemo = glm::rotate(mDemo, glm::radians(demoYaw), glm::vec3(0.0f, 1.0f, 0.0f));
-            mDemo = glm::scale(mDemo, glm::vec3(1.1f));
-            shSkin->setMat4("model", mDemo);
-            shSkin->setMat4("gBones", MAX_RIGGING_BONES, demoSkin->gBones);
-            demoSkin->Draw(*shSkin);
-            // restaurar shader opaco del resto del pase
-            sh->use();
-            ConfigurarShader(proj, view, cam, t, camBuzo);
-        }
-
         // 3) Superficie del agua vista desde abajo (Fresnel + ventana de Snell)
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         shSuperficie->use();
@@ -434,10 +397,6 @@ public:
 
 private:
     Shader* sh = nullptr, * shFondo = nullptr, * shSuperficie = nullptr, * shPicking = nullptr;
-    Shader* shSkin = nullptr;
-    AnimatedModel* demoSkin = nullptr;   // demo A2b (KAYA), solo Zona 1
-    glm::vec3 demoPos = glm::vec3(0.0f);
-    float demoYaw = 0.0f;
     GLuint vaoVacio = 0, vaoQuad = 0, vboQuad = 0, cubo = 0;
     std::map<std::string, Model*> cache;
     std::vector<Elemento> elementos;

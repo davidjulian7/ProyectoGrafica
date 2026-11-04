@@ -1,0 +1,12 @@
+ACTUALIZACION ZONA 1 - ARRECIFES (estres termico y blanqueamiento)
+
+1. En Git Bash, dentro de ProyectoGrafica:  git pull
+2. Extrae este zip DENTRO de ProyectoGrafica y acepta reemplazar.
+3. Visual Studio: Debug x64, F5. Entra a la Zona 1.
+
+Controles de la Zona 1:
+  Q / E  bajar / subir la temperatura del agua
+  T      calentamiento automatico (ola de calor)
+  R      restaurar el arrecife
+  Mira   apunta a una especie: aparece su ficha y se registra en la bitacora
+  F1     silenciar / activar sonido

@@ -65,7 +65,7 @@ public:
     }
 
     // render the mesh
-    void Draw(Shader shader) 
+    void Draw(Shader &shader)   // por referencia: evita copiar el shader en cada objeto 
     {
         // bind appropriate textures
         unsigned int diffuseNr  = 1;

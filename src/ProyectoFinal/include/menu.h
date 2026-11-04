@@ -26,6 +26,10 @@
 
 #include <shader_m.h>
 #include <stb_image.h>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <fichas.h>
 
 // Utilidades sin depender de std::min/std::max (Windows define macros min/max).
 inline float menuMin(float a, float b) { return a < b ? a : b; }
@@ -36,6 +40,14 @@ struct MenuTextura {
     GLuint id = 0;
     int ancho = 0;
     int alto = 0;
+};
+
+// Atlas de fuente generado con herramientas/genera_fuente_y_sonidos.py
+struct MenuFuente {
+    MenuTextura tex;
+    float base = 56.0f, asc = 0.0f, desc = 0.0f;
+    std::map<int, glm::vec4> rect;   // x, y, ancho, alto en el atlas (pixeles)
+    std::map<int, glm::vec3> met;    // desplazamiento x, desplazamiento y, avance
 };
 
 inline MenuTextura menuCargarTextura(const std::string& ruta)
@@ -80,6 +92,8 @@ public:
         titulo = menuCargarTextura("textures/menu/titulo.png");
         pie = menuCargarTextura("textures/menu/pie.png");
         controles = menuCargarTextura("textures/menu/hud_controles.png");
+        CargarFuente(negrita, "textures/menu/fuente_negrita");
+        CargarFuente(normal, "textures/menu/fuente_normal");
 
         bool ok = titulo.id && pie.id;
         for (int i = 0; i < NUM_ZONAS; i++) ok = ok && tarjetas[i].id && hud[i].id;
@@ -259,7 +273,7 @@ public:
 
     // HUD dentro de una zona: insignia con el nombre y fundido de entrada.
     // zona: 1..3, fundidoEntrada: 1 = negro, 0 = transparente.
-    void DrawHUD(GLFWwindow* ventana, int zona, float fundidoEntrada, float tiempoEnZona = 0.0f)
+    void DrawHUD(GLFWwindow* ventana, int zona, float fundidoEntrada, float tiempoEnZona = 0.0f, bool ayudaGenerica = true)
     {
         if (zona < 1 || zona > NUM_ZONAS) return;
         Layout(ventana);
@@ -283,7 +297,7 @@ public:
 
         // ayuda de controles: visible los primeros 10 segundos en la zona
         float ayuda = 1.0f - Suave((tiempoEnZona - 10.0f) / 1.5f);
-        if (ayuda > 0.0f && controles.id) {
+        if (ayuda > 0.0f && controles.id && ayudaGenerica) {
             float cw = menuMin(fbW * 0.9f, 900.0f * escala);
             float ch = cw * (float)controles.alto / menuMax(1.0f, (float)controles.ancho);
             DibujarImagen(controles, glm::vec4((fbW - cw) * 0.5f, fbH - ch - 22.0f * escala, cw, ch), 0.0f, 0.0f, glm::vec4(0.0f), ayuda, 1.0f);
@@ -298,7 +312,8 @@ public:
     }
 
     // Mira del buzo en el centro de la pantalla y nombre de lo que apunta.
-    void DrawMira(GLFWwindow* ventana, const std::string& etiqueta, bool basura)
+    void DrawMira(GLFWwindow* ventana, const std::string& etiqueta, bool basura,
+                  const std::string& detalle = std::string(), glm::vec3 colorDetalle = glm::vec3(1.0f))
     {
         Layout(ventana);
         GLint modoPoligono[2];
@@ -325,10 +340,14 @@ public:
         DibujarColor(glm::vec4(cx - grosor * 0.5f, cy + sep, grosor, largo), c, 0.0f, 1.0f);
 
         if (hay) {
-            const MenuTextura& t = Etiqueta(etiqueta);
-            if (t.id) {
-                float w = 320.0f * escala, h = w * (float)t.alto / menuMax(1.0f, (float)t.ancho);
-                DibujarImagen(t, glm::vec4(cx - w * 0.5f, cy + 30.0f * escala, w, h), 0.0f, 0.0f, glm::vec4(0.0f), 0.95f, 1.0f);
+            const Ficha* f = BuscarFicha(etiqueta);
+            if (f && negrita.tex.id) TarjetaFicha(*f, cx, cy + 30.0f * escala, detalle, colorDetalle);
+            else {
+                const MenuTextura& t = Etiqueta(etiqueta);
+                if (t.id) {
+                    float w = 320.0f * escala, h = w * (float)t.alto / menuMax(1.0f, (float)t.ancho);
+                    DibujarImagen(t, glm::vec4(cx - w * 0.5f, cy + 30.0f * escala, w, h), 0.0f, 0.0f, glm::vec4(0.0f), 0.95f, 1.0f);
+                }
             }
         }
         glBindVertexArray(0);
@@ -336,8 +355,156 @@ public:
         glPolygonMode(GL_FRONT_AND_BACK, modoPoligono[0]);
     }
 
+    // ------------------------------------------------------------------
+    // API de interfaz para el HUD de las zonas (texto, paneles, barras)
+    // Uso: Comenzar(ventana); ...Texto/Rect...; Terminar();
+    // ------------------------------------------------------------------
+    void Comenzar(GLFWwindow* ventana)
+    {
+        Layout(ventana);
+        glGetIntegerv(GL_POLYGON_MODE, modoGuardado);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        ui->use();
+        ui->setVec2("uScreen", glm::vec2(fbW, fbH));
+        ui->setInt("uTex", 0);
+        glBindVertexArray(vaoQuad);
+        glActiveTexture(GL_TEXTURE0);
+    }
+    void Terminar()
+    {
+        glBindVertexArray(0);
+        glEnable(GL_DEPTH_TEST);
+        glPolygonMode(GL_FRONT_AND_BACK, modoGuardado[0]);
+    }
+    float Escala() const { return escala; }
+    float Ancho() const { return fbW; }
+    float Alto() const { return fbH; }
+    void Rect(glm::vec4 r, glm::vec4 color, float radio = 0.0f) { DibujarColor(r, color, radio, 1.0f); }
+    void Resplandor(glm::vec4 r, glm::vec4 color, float radio, float pad) { DibujarBrillo(r, color, radio, pad, 1.0f); }
+
+    // Ancho en pixeles de un texto (UTF-8)
+    float MedirTexto(const std::string& s, float tam, bool usarNegrita = true)
+    {
+        MenuFuente& f = usarNegrita ? negrita : normal;
+        float k = tam / f.base, x = 0.0f;
+        for (size_t i = 0; i < s.size(); ) {
+            int cp = SiguienteLetra(s, i);
+            auto m = f.met.find(cp);
+            if (m != f.met.end()) x += m->second.z * k;
+        }
+        return x;
+    }
+
+    // Dibuja texto. y = parte superior de la linea. alinear: 0 izquierda, 1 centro, 2 derecha
+    float Texto(const std::string& s, float x, float y, float tam, glm::vec4 color, int alinear = 0, bool usarNegrita = true, bool sombra = true)
+    {
+        MenuFuente& f = usarNegrita ? negrita : normal;
+        if (!f.tex.id) return 0.0f;
+        float ancho = MedirTexto(s, tam, usarNegrita);
+        if (alinear == 1) x -= ancho * 0.5f; else if (alinear == 2) x -= ancho;
+        glBindTexture(GL_TEXTURE_2D, f.tex.id);
+        ui->setInt("uMode", 3);
+        ui->setFloat("uAlpha", 1.0f);
+        if (sombra) Letras(f, s, x + tam * 0.06f, y + tam * 0.06f, tam, glm::vec4(0.0f, 0.02f, 0.05f, color.a * 0.7f));
+        Letras(f, s, x, y, tam, color);
+        return ancho;
+    }
+
+    // Parte un texto en lineas que caben en 'ancho'
+    std::vector<std::string> Lineas(const std::string& s, float ancho, float tam, bool usarNegrita = false)
+    {
+        std::vector<std::string> res;
+        std::istringstream in(s);
+        std::string palabra, linea;
+        while (in >> palabra) {
+            std::string prueba = linea.empty() ? palabra : linea + " " + palabra;
+            if (!linea.empty() && MedirTexto(prueba, tam, usarNegrita) > ancho) { res.push_back(linea); linea = palabra; }
+            else linea = prueba;
+        }
+        if (!linea.empty()) res.push_back(linea);
+        return res;
+    }
+
+    // Parrafo con ajuste de linea; devuelve la altura usada
+    float Parrafo(const std::string& s, float x, float y, float ancho, float tam, glm::vec4 color, bool usarNegrita = false, int alinear = 0)
+    {
+        std::vector<std::string> ls = Lineas(s, ancho, tam, usarNegrita);
+        float alto = tam * 1.3f;
+        for (size_t i = 0; i < ls.size(); i++) Texto(ls[i], alinear == 1 ? x + ancho * 0.5f : x, y + i * alto, tam, color, alinear, usarNegrita);
+        return ls.size() * alto;
+    }
+
 private:
     MenuTextura controles;
+    MenuFuente negrita, normal;
+    GLint modoGuardado[2] = { GL_FILL, GL_FILL };
+
+    static int SiguienteLetra(const std::string& s, size_t& i)
+    {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x80) { i++; return c; }
+        if ((c >> 5) == 6 && i + 1 < s.size()) { int cp = ((c & 0x1F) << 6) | (s[i + 1] & 0x3F); i += 2; return cp; }
+        if ((c >> 4) == 14 && i + 2 < s.size()) { int cp = ((c & 0x0F) << 12) | ((s[i + 1] & 0x3F) << 6) | (s[i + 2] & 0x3F); i += 3; return cp; }
+        i++; return '?';
+    }
+
+    void CargarFuente(MenuFuente& f, const std::string& ruta)
+    {
+        f.tex = menuCargarTextura(ruta + ".png");
+        std::ifstream in(ruta + ".txt");
+        if (!in) { std::cout << "[Menu] Falta la fuente " << ruta << ".txt" << std::endl; return; }
+        in >> f.base >> f.asc >> f.desc;
+        int cp; float x, y, w, h, ox, oy, av;
+        while (in >> cp >> x >> y >> w >> h >> ox >> oy >> av) {
+            f.rect[cp] = glm::vec4(x, y, w, h);
+            f.met[cp] = glm::vec3(ox, oy, av);
+        }
+    }
+
+    void Letras(MenuFuente& f, const std::string& s, float x, float y, float tam, glm::vec4 color)
+    {
+        float k = tam / f.base;
+        ui->setVec4("uColor", color);
+        for (size_t i = 0; i < s.size(); ) {
+            int cp = SiguienteLetra(s, i);
+            auto r = f.rect.find(cp);
+            auto m = f.met.find(cp);
+            if (r == f.rect.end() || m == f.met.end()) continue;
+            if (cp != ' ') {
+                glm::vec4 q = r->second;
+                ui->setVec4("uRect", glm::vec4(x + m->second.x * k, y + m->second.y * k, q.z * k, q.w * k));
+                ui->setVec2("uSize", glm::vec2(q.z * k, q.w * k));
+                ui->setVec4("uUV", glm::vec4(q.x / f.tex.ancho, q.y / f.tex.alto, q.z / f.tex.ancho, q.w / f.tex.alto));
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+            x += m->second.z * k;
+        }
+    }
+
+    // Tarjeta educativa bajo la mira
+    void TarjetaFicha(const Ficha& f, float cx, float y, const std::string& detalle, glm::vec3 colorDetalle)
+    {
+        float s = escala, w = 470.0f * s, pad = 16.0f * s;
+        std::vector<std::string> ls = Lineas(f.dato, w - 2 * pad, 15.0f * s, false);
+        float h = pad + 18.0f * s + 32.0f * s + 22.0f * s + ls.size() * 15.0f * s * 1.3f + (detalle.empty() ? 0.0f : 24.0f * s) + pad;
+        if (y + h > fbH - 12.0f * s) y = fbH - 12.0f * s - h;
+        glm::vec3 ac = f.categoria == "BASURA" ? glm::vec3(1.0f, 0.6f, 0.45f)
+                     : f.categoria == "EN PELIGRO" ? glm::vec3(1.0f, 0.5f, 0.5f)
+                     : f.categoria == "ESPECIE INVASORA" ? glm::vec3(1.0f, 0.75f, 0.35f)
+                     : f.categoria == "ARRECIFE" ? glm::vec3(1.0f, 0.62f, 0.45f) : glm::vec3(0.55f, 0.9f, 1.0f);
+        float x = cx - w * 0.5f;
+        DibujarColor(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.80f), 14.0f * s, 1.0f);
+        DibujarColor(glm::vec4(x, y, 4.0f * s, h), glm::vec4(ac, 0.9f), 2.0f * s, 1.0f);
+        float yy = y + pad;
+        Texto(f.categoria, x + pad, yy, 13.0f * s, glm::vec4(ac, 1.0f)); yy += 18.0f * s;
+        Texto(f.nombre, x + pad, yy, 25.0f * s, glm::vec4(1.0f)); yy += 32.0f * s;
+        Texto(f.estado, x + pad, yy, 14.0f * s, glm::vec4(0.75f, 0.85f, 0.9f, 1.0f), 0, false); yy += 22.0f * s;
+        for (const std::string& l : ls) { Texto(l, x + pad, yy, 15.0f * s, glm::vec4(0.92f, 0.95f, 0.97f, 1.0f), 0, false); yy += 15.0f * s * 1.3f; }
+        if (!detalle.empty()) Texto(detalle, x + pad, yy + 4.0f * s, 15.0f * s, glm::vec4(colorDetalle, 1.0f));
+    }
     std::map<std::string, MenuTextura> etiquetas;
 
     // "Pez leon (invasor)" -> textures/menu/etiquetas/pez_leon_invasor.png
@@ -427,6 +594,7 @@ private:
     {
         if (!t.id || alpha <= 0.001f) return;
         glBindTexture(GL_TEXTURE_2D, t.id);
+        ui->setVec4("uUV", glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
         ui->setInt("uMode", 0);
         ui->setVec4("uRect", r);
         ui->setVec2("uSize", glm::vec2(r.z, r.w));
@@ -440,6 +608,7 @@ private:
 
     void DibujarColor(glm::vec4 r, glm::vec4 color, float radio, float alpha)
     {
+        ui->setVec4("uUV", glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
         ui->setInt("uMode", 1);
         ui->setVec4("uRect", r);
         ui->setVec2("uSize", glm::vec2(r.z, r.w));

@@ -14,6 +14,7 @@ uniform float uLargo;     // medio largo del modelo (la cabeza esta en +X)
 uniform float uVelNado;   // velocidad de la ondulacion
 uniform float uMecer;     // vaiven de algas y abanicos
 uniform float uFase;
+uniform int   uOndulaEje;  // 0 = cola de lado a lado (peces), 1 = de arriba a abajo (mamiferos)
 
 out vec3 vPosMundo;
 out vec3 vNormal;
@@ -26,7 +27,8 @@ void main()
         // 0 en la cabeza, 1 en la cola: la cola se mueve mas que la cabeza
         float t = clamp((uLargo - p.x) / (2.0 * uLargo), 0.0, 1.0);
         float w = uOndula * pow(t, 1.6) * uLargo;
-        p.z += w * sin(p.x / uLargo * 3.0 - uTiempo * uVelNado + uFase);
+        float onda = w * sin(p.x / uLargo * 3.0 - uTiempo * uVelNado + uFase);
+        if (uOndulaEje == 1) p.y += onda; else p.z += onda;
     }
     if (uMecer > 0.0) {
         float h = max(p.y, 0.0);

@@ -27,6 +27,9 @@
     <ClInclude Include="..\..\include\camera.h"><Filter>Encabezados</Filter></ClInclude>
     <ClInclude Include="..\..\include\modelstructs.h"><Filter>Encabezados</Filter></ClInclude>
     <ClInclude Include="..\..\include\zonas.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\arrecife.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\fichas.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\naufragios.h"><Filter>Encabezados</Filter></ClInclude>
     <ClInclude Include="..\..\include\model.h"><Filter>Encabezados</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>

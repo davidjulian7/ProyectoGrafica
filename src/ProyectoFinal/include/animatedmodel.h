@@ -48,7 +48,7 @@ public:
     }
 
     // draws the model, and thus all its meshes
-    void Draw(Shader shader)
+    void Draw(Shader &shader)   // por referencia: evita copiar el shader en cada objeto
     {
         for(unsigned int i = 0; i < meshes.size(); i++)
             meshes[i].Draw(shader);
@@ -84,7 +84,7 @@ public:
 			if (animationCount > keys - 1) {
 				animationCount = 0;
 			}
-			// Configuraci�n de la pose en el instante t
+			// Configuración de la pose en el instante t
 			SetPose((float)animationCount, gBones);
 			elapsedTime = 0.0f;
 		}

@@ -9,7 +9,7 @@
 #   - el origen queda en el centro de la caja envolvente
 #   - FBX con transformaciones horneadas (no hace falta rotar -90 en el codigo)
 #   - una textura .jpg de 1024 px junto al .fbx (stb_image no lee .webp)
-import bpy, bmesh, os, math, random, glob
+import bpy, bmesh, os, sys, math, random, glob
 import numpy as np
 from mathutils import Vector, Matrix
 from PIL import Image, ImageDraw, ImageFilter
@@ -35,15 +35,20 @@ MODELOS = {
     'Llanta': ('naufragios', 0, 0.9), 'bolsaplastico': ('naufragios', 0, 0.6),
     'pezleon': ('naufragios', 90, 0.5), 'barracuda': ('naufragios', 180, 1.4),
     'Tiburon': ('naufragios', 90, 3.0), 'vacamarina': ('naufragios', 90, 1.5),
+    'BarcoRuinas': ('naufragios', 0, 14.0),            # modelo de Julian
 }
 # Modelos sin textura utilizable: se les da una proyeccion lateral y una textura pintada
 PINTADOS = {
     'Pezcirujano': ((40, 80, 200), (25, 50, 150), (250, 205, 40)),
     'barracuda': ((70, 85, 100), (215, 222, 228), None),
     'Tiburon': ((85, 100, 115), (230, 232, 235), None),
-    'tortuga': ((90, 105, 55), (210, 195, 140), None),
 }
 OMITIR = ('view', 'metarig', 'reference')
+# texturas que no vienen empaquetadas en el .blend pero si estan en el repositorio
+TEXTURA_EXTERNA = {
+    'tortuga': os.path.join(RAIZ, 'src', 'bin', 'models', 'zonas', 'arrecifes', 'texturaTortuga.png'),
+}
+SOLO = [a for a in sys.argv[sys.argv.index('--') + 1:]] if '--' in sys.argv else []
 rnd = random.Random(7)
 
 # ---------------------------------------------------------------- utilidades
@@ -140,6 +145,7 @@ TABLA = []   # (zona, nombre, largo X, alto Y, ancho Z)
 # ---------------------------------------------------------------- 1. modelos del equipo
 def exportar_modelos():
     for nombre, (zona, rot, tam) in MODELOS.items():
+        if SOLO and nombre not in SOLO: continue
         ruta = os.path.join(ENTRADA, nombre + '.blend')
         if not os.path.exists(ruta): print('FALTA', ruta); continue
         bpy.ops.wm.open_mainfile(filepath=ruta, load_ui=False)
@@ -154,13 +160,19 @@ def exportar_modelos():
             bm.from_mesh(me); ev.to_mesh_clear()
             for s in o.material_slots:
                 if s.material and s.material.use_nodes and imagen is None:
-                    for nd in s.material.node_tree.nodes:
-                        if nd.type == 'TEX_IMAGE' and nd.image and 'metallic' not in nd.image.name:
-                            imagen = nd.image
+                    nt = s.material.node_tree
+                    bsdf = next((nd for nd in nt.nodes if nd.type == 'BSDF_PRINCIPLED'), None)
+                    if bsdf and bsdf.inputs['Base Color'].is_linked:          # la imagen conectada al color base
+                        src = bsdf.inputs['Base Color'].links[0].from_node
+                        if src.type == 'TEX_IMAGE' and src.image: imagen = src.image
+                    if imagen is None:
+                        for nd in nt.nodes:
+                            if nd.type == 'TEX_IMAGE' and nd.image and 'metallic' not in nd.image.name and 'normal' not in nd.image.name.lower():
+                                imagen = nd.image
         ob = nuevo_objeto(nombre, bm)
         carpeta = os.path.join(SALIDA, zona)
-        if len(ob.data.polygons) > 20000:          # tiburon: 57k triangulos -> ~6k
-            d = ob.modifiers.new('dec', 'DECIMATE'); d.ratio = 0.1
+        if len(ob.data.polygons) > 12000:          # mallas muy pesadas (tiburon, tortuga, barco) -> ~8k caras
+            d = ob.modifiers.new('dec', 'DECIMATE'); d.ratio = max(0.08, 8000.0 / len(ob.data.polygons))
             ev = ob.evaluated_get(bpy.context.evaluated_depsgraph_get()); me2 = bpy.data.meshes.new_from_object(ev)
             ob.modifiers.clear(); ob.data = me2
         dims = normalizar(ob, rot, tam)
@@ -171,6 +183,8 @@ def exportar_modelos():
             Image.open(os.path.join(RAIZ, 'src', 'bin', 'models', 'PezPayaso.webp')).convert('RGB').save(os.path.join(carpeta, archivo), quality=92)
         elif imagen is not None and imagen.size[0] > 0:
             imagen_a_jpg(imagen, archivo, carpeta)
+        elif nombre in TEXTURA_EXTERNA and os.path.exists(TEXTURA_EXTERNA[nombre]):
+            Image.open(TEXTURA_EXTERNA[nombre]).convert('RGB').save(os.path.join(carpeta, archivo), quality=90)
         else:
             print('SIN TEXTURA', nombre); uv_lateral(ob); textura_pintada(((120, 120, 120), (200, 200, 200), None), archivo, carpeta)
         material_con_textura(ob, archivo)
@@ -425,6 +439,7 @@ def escenografia():
 
 if __name__ == '__main__':
     exportar_modelos()
+    if SOLO: raise SystemExit
     escenografia()
     with open(os.path.join(SALIDA, 'medidas.txt'), 'w') as f:
         f.write('# zona nombre largoX altoY anchoZ (metros, ejes de OpenGL)\n')

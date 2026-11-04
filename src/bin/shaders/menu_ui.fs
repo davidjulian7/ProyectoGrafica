@@ -2,7 +2,9 @@
 // Modos: 0 = imagen con esquinas redondeadas y borde
 //        1 = color solido redondeado (paneles y transiciones)
 //        2 = resplandor alrededor de un rectangulo
+//        3 = letra (alfa del atlas de fuente, color uColor)
 in vec2 vUV;
+in vec2 vTex;
 out vec4 FragColor;
 
 uniform sampler2D uTex;
@@ -28,7 +30,7 @@ void main()
     if (uMode == 0) {
         float d = sdRoundBox(p, uSize * 0.5, uRadius);
         float aa = 1.0 - smoothstep(-1.0, 0.5, d);
-        vec4 c = texture(uTex, vUV);
+        vec4 c = texture(uTex, vTex);
         c.rgb *= uBright;
         float border = smoothstep(-uBorder - 1.0, -uBorder, d);
         c.rgb = mix(c.rgb, uColor.rgb, border * uColor.a);
@@ -38,6 +40,9 @@ void main()
         float d = sdRoundBox(p, uSize * 0.5, uRadius);
         float aa = 1.0 - smoothstep(-1.0, 0.5, d);
         FragColor = vec4(uColor.rgb, uColor.a * aa * uAlpha);
+    }
+    else if (uMode == 3) {
+        FragColor = vec4(uColor.rgb, texture(uTex, vTex).a * uColor.a * uAlpha);
     }
     else {
         float d = sdRoundBox(p, uSize * 0.5 - uGlowPad, uRadius);

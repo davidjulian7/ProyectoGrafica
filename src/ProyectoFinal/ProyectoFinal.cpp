@@ -42,6 +42,8 @@
 #include <particles.h>
 #include <menu.h>          // menú de inicio y HUD de zonas
 #include <zonas.h>         // contenido y render de las tres zonas
+#include <arrecife.h>      // Zona 1: termómetro y blanqueamiento de coral
+#include <naufragios.h>    // Zona 3: limpieza, pez león, red fantasma y cofre
 #include <cmath>
 
 #include <irrKlang.h>
@@ -81,10 +83,12 @@ float zonaFade = 0.0f;      // fundido de entrada a una zona: 1 = negro, 0 = vis
 float zonaTiempo = 0.0f;    // segundos dentro de la zona actual
 
 Escenario escenario;        // zonas de inmersión (include/zonas.h)
+MecanicaArrecife arrecife;  // mecánica de la Zona 1 (include/arrecife.h)
+MecanicaNaufragios naufragio; // mecánica de la Zona 3 (include/naufragios.h)
 
 // --- Buzo: nado con inercia (etapa 1) ---
 glm::vec3 diverVelocity(0.0f);
-const float DIVER_ACCEL = 6.0f;   // qué tan rápido arranca al aletear
+const float DIVER_ACCEL = 3.5f;   // qué tan rápido arranca al aletear (velocidad máxima ~1.4 m/s)
 const float DIVER_DRAG  = 2.5f;   // resistencia del agua (frena al soltar las teclas)
 
 // Tamaño en pixeles de la ventana
@@ -161,6 +165,27 @@ int pickedFish = -1; // índice del pez seleccionado, -1 = ninguno
 
 // Audio
 ISoundEngine* SoundEngine = createIrrKlangDevice();
+ISound* sonidoAmbiente = nullptr;   // ambiente en bucle de la zona actual
+bool silencio = false;
+
+// Cambia el sonido ambiente (nullptr = detener)
+void Ambiente(const char* archivo, float volumen)
+{
+	if (!SoundEngine) return;
+	if (sonidoAmbiente) { sonidoAmbiente->stop(); sonidoAmbiente->drop(); sonidoAmbiente = nullptr; }
+	if (archivo) {
+		sonidoAmbiente = SoundEngine->play2D(archivo, true, false, true);
+		if (sonidoAmbiente) sonidoAmbiente->setVolume(volumen);
+	}
+}
+
+// Efecto corto (burbujas, alerta, descubrimiento)
+void Efecto(const char* archivo, float volumen)
+{
+	if (!SoundEngine || silencio) return;
+	ISound* s = SoundEngine->play2D(archivo, false, false, true);
+	if (s) { s->setVolume(volumen); s->drop(); }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers para uniformes de luces (iguales a los de la práctica 13)
@@ -285,6 +310,7 @@ bool Start() {
 
 	// Zonas de inmersión (los modelos de cada zona se cargan al entrar a ella)
 	escenario.Init(mainCubeMap->textureID);
+	Ambiente("sound/ambiente_arrecife.wav", 0.25f);   // ambiente suave en el menú
 
 	// Configuración del sistema de partículas (burbujas que suben)
 	// gravedad negativa hacia arriba para simular flotabilidad
@@ -474,7 +500,19 @@ bool Update() {
 
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
 	processInput(window);
-	escenario.Actualizar(deltaTime, animTime, camera);
+	if (escenario.Actualizar(deltaTime, animTime, camera))
+		Efecto("sound/burbujas.wav", 0.35f);          // exhalación del buzo
+	if (estadoActual == ARRECIFES) {
+		arrecife.Actualizar(deltaTime, window, escenario, escenario.Seleccionado());
+		if (arrecife.sonarAlerta) { Efecto("sound/alerta.wav", 0.6f); arrecife.sonarAlerta = false; }
+		if (arrecife.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); arrecife.sonarDescubrir = false; }
+	}
+	if (estadoActual == NAUFRAGIOS) {
+		naufragio.Actualizar(deltaTime, animTime, window, escenario, camera, escenario.Seleccionado());
+		if (naufragio.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); naufragio.sonarRecoger = false; }
+		if (naufragio.sonarAlerta) { Efecto("sound/alerta.wav", 0.5f); naufragio.sonarAlerta = false; }
+		if (naufragio.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); naufragio.sonarDescubrir = false; }
+	}
 
 	// Vaivén de la vista: respiración siempre presente + aleteo al nadar
 	float nado = glm::length(diverVelocity);
@@ -511,9 +549,15 @@ bool Update() {
 	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera);
 
 	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
-	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo);
 	const Elemento* sel = escenario.Seleccionado();
-	menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura);
+	glm::vec3 colorDetalle(1.0f);
+	std::string detalle = !sel ? std::string()
+		: estadoActual == ARRECIFES ? arrecife.Detalle(*sel, colorDetalle)
+		: estadoActual == NAUFRAGIOS ? naufragio.Detalle(*sel, colorDetalle) : std::string();
+	menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
+	if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
+	if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
+	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
 	zonaFade = zonaFade - deltaTime * 1.4f;
 	if (zonaFade < 0.0f) zonaFade = 0.0f;
 
@@ -575,7 +619,7 @@ void processInput(GLFWwindow* window)
 		if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
 		    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) wish.y -= 1.0f;                // bajar
 		if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
-		float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.2f : 1.0f;
+		float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.0f : 1.0f;
 
 		diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
 		diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
@@ -601,14 +645,7 @@ void processInput(GLFWwindow* window)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
 
 	// Activar sonido ambiental con F1
-	if (glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS) {
-		static bool soundOn = false;
-		if (!soundOn) {
-			SoundEngine->play2D("sound/field.mp3", true);
-			soundOn = true;
-			std::cout << "Sonido ambiental activado" << std::endl;
-		}
-	}
+	// F1 (silenciar) se maneja en key_callback
 }
 
 // ---------------------------------------------------------------------------
@@ -622,7 +659,10 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 		return;
 	}
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		escenario.Interactuar();   // recoger basura o ver el nombre del animal
+		if (estadoActual == NAUFRAGIOS && !escenario.modoEdicion)
+			naufragio.Clic(escenario.seleccion, escenario, animTime);   // recoger, retirar invasor, cofre
+		else
+			escenario.Interactuar();   // ver el nombre del animal
 		// En modo edición, el clic también fija el objeto a editar
 		if (escenario.modoEdicion)
 			escenario.FijarEditableDesdeSeleccion();
@@ -687,6 +727,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
 	if (action != GLFW_PRESS) return;
 
+	if (key == GLFW_KEY_F1) {   // silenciar / activar sonido
+		silencio = !silencio;
+		if (sonidoAmbiente) sonidoAmbiente->setVolume(silencio ? 0.0f : (estadoActual == MENU ? 0.25f : 0.6f));
+		std::cout << (silencio ? ">> Sonido silenciado" : ">> Sonido activado") << std::endl;
+		return;
+	}
+
 	if (estadoActual == MENU) {
 		if (key == GLFW_KEY_ESCAPE)
 			glfwSetWindowShouldClose(window, true);
@@ -728,6 +775,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	else if (escenario.modoEdicion && key == GLFW_KEY_F5) {
 		escenario.GuardarPoseActual();
 	}
+	else if (estadoActual == ARRECIFES && !escenario.modoEdicion)
+		arrecife.Tecla(key, escenario);   // R restaurar, T calentamiento automático
 }
 
 // ---------------------------------------------------------------------------
@@ -756,6 +805,10 @@ void EntrarZona(int zona)
 
 	// Carga la zona (la primera vez lee sus modelos) y coloca al buzo en su punto de inicio
 	escenario.Entrar(zona, camera);
+	if (zona == ARRECIFES) arrecife.Reiniciar(escenario);
+	if (zona == NAUFRAGIOS) naufragio.Reiniciar(escenario, animTime);
+	const char* ambientes[] = { "", "sound/ambiente_arrecife.wav", "sound/ambiente_frio.wav", "sound/ambiente_naufragio.wav" };
+	Ambiente(ambientes[zona], silencio ? 0.0f : 0.6f);
 	diverVelocity = glm::vec3(0.0f);
 	firstMouse = true;
 	pickedFish = -1;
@@ -781,6 +834,7 @@ void VolverAlMenu()
 {
 	estadoActual = MENU;
 	menuInicio.Reiniciar();
+	Ambiente("sound/ambiente_arrecife.wav", silencio ? 0.0f : 0.25f);   // ambiente suave en el menú
 	modoOrbita = false;
 	orbitDist = 6.0f;
 	escenario.modoEdicion = false;

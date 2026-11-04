@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <deque>
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -68,10 +69,28 @@ struct Elemento {
     // animacion por cuadros clave (MOV_KF); apunta a un AnimacionKF con duracion estable
     const AnimacionKF* kf = nullptr;
     bool visible = true;
+    // mecanicas
+    bool esCoral = false;              // se blanquea con la temperatura (corales, anemonas, almejas)
+    float sensibilidad = 1.0f;         // que tan rapido se estresa con el calor
+    float estres = 0.0f;               // estres termico acumulado (0 = sano, 1 = blanqueado)
+    float blanqueo = 0.0f;             // 0..1 visual
+    float muerte = 0.0f;               // 0..1 visual (coral muerto cubierto de algas)
+    float presencia = 1.0f;            // fraccion visible de un cardumen
+    bool inflable = false;             // pez globo: se infla si el buzo se acerca
+    float inflado = 0.0f;
+    bool camuflaje = false;            // pulpo: cambia de color
+    bool ondulaVertical = false;       // mamiferos: mueven la cola de arriba a abajo
+    int residuo = 0;                   // Zona 3: 0 no es basura, 1 plastico, 2 metal, 3 toxico, 4 red
+    float peso = 1.0f;                 // cuanto aporta a la limpieza del agua
+    bool invasor = false;              // especie invasora que se puede retirar
+    bool pulsar = false;               // medusa: la campana se contrae y se expande
+    float fantasma = 0.0f;             // brillo de borde tipo Fresnel (traslucidos)
+    float kfInicio = 0.0f;             // MOV_KF: segundo en que empieza la animacion
     // calculado al cargar
     Model* modelo = nullptr;
     unsigned int id = 0;
     float medioLargo = 0.5f;
+    float radioBase = 1.0f;            // radio de la esfera envolvente del modelo (sin escala)
     float baseY = 0.0f;
 };
 
@@ -104,6 +123,7 @@ class Escenario
 {
 public:
     ZonaConfig cfg;
+    ZonaConfig cfgBase;                 // configuracion original de la zona (las mecanicas la modifican)
     bool linterna = false;
     int zona = 0;
     int seleccion = -1;                 // indice del elemento bajo la mira
@@ -131,7 +151,12 @@ public:
     void Entrar(int z, Camera& cam)
     {
         zona = z;
-        elementos.clear(); burbujas.clear(); seleccion = -1;
+        elementos.clear(); burbujas.clear(); animaciones.clear(); seleccion = -1;
+        // terreno primero: los elementos se colocan sobre el al construirse
+        const char* terrenos[] = { "", "terreno_arrecifes", "terreno_aguas_frias", "terreno_naufragios" };
+        const char* carpetas[] = { "", "arrecifes", "aguas_frias", "naufragios" };
+        terreno = Cargar(terrenos[z], carpetas[z]);
+        CalcularAlturas(terreno);
         if (z == 1) ConstruirArrecifes();
         else if (z == 2) ConstruirAguasFrias();
         else ConstruirNaufragios();
@@ -144,11 +169,13 @@ public:
             Elemento& e = elementos[i];
             e.modelo = Cargar(e.archivo, e.carpeta);
             e.medioLargo = MedioLargo(e.modelo);
+            e.radioBase = RadioModelo(e.modelo);
             e.id = 1000 + (unsigned int)i;
             e.baseY = e.sobreSuelo ? AlturaSuelo(e.pos.x, e.pos.z) : 0.0f;
             if (e.basura) basuraTotal++;
         }
         burbujaModelo = Cargar("burbuja", "comun");
+        cfgBase = cfg;
         for (auto& f : fuentes) f.y += AlturaSuelo(f.x, f.z);   // las fuentes se miden desde el fondo
         linterna = cfg.linterna;
 
@@ -170,16 +197,39 @@ public:
     }
 
     // Burbujas y animaciones. 'exhala' agrega las burbujas del regulador del buzo.
-    void Actualizar(float dt, float t, const Camera& cam)
+    std::vector<Elemento>& Elementos() { return elementos; }
+
+    // Posicion actual (centro del primer miembro) de un elemento
+    glm::vec3 Posicion(int i, float t) const { return glm::vec3(Matriz(elementos[i], i, 0, t)[3]); }
+
+    // Guarda una animacion por cuadros clave propia de la zona (direccion estable)
+    const AnimacionKF* GuardarKF(const AnimacionKF& a) { animaciones.push_back(a); return &animaciones.back(); }
+
+    // Devuelve true en el cuadro en que el buzo exhala (para el sonido de burbujas)
+    bool Actualizar(float dt, float t, const Camera& cam)
     {
         if (dt > 0.1f) dt = 0.1f;
+        bool exhalo = false;
+        for (size_t i = 0; i < elementos.size(); i++) {
+            Elemento& e = elementos[i];
+            if (!e.inflable) continue;
+            glm::vec3 p = glm::vec3(Matriz(e, (int)i, 0, t)[3]);
+            float objetivo = glm::length(p - cam.Position) < 3.5f ? 1.0f : 0.0f;
+            e.inflado += (objetivo - e.inflado) * (dt * (objetivo > e.inflado ? 4.0f : 0.8f));
+        }
         // respiracion del buzo: cada 4.5 s sale una nube de burbujas frente a la mascara
         respiracion += dt;
         if (respiracion > 4.5f) {
             respiracion = 0.0f;
+            exhalo = true;
             // salen por debajo de la mascara y suben frente a la vista
-            glm::vec3 boca = cam.Position + cam.Front * 0.45f - cam.Up * 0.6f;
-            for (int k = 0; k < 10; k++) burbujas.push_back({ boca + Aleatorio3(k + (int)(t * 10)) * 0.12f, 0.9f + Aleatorio(k, 3) * 0.6f, 0.012f + Aleatorio(k, 5) * 0.02f, Aleatorio(k, 9) * 6.0f });
+            // el regulador expulsa el aire a los costados de la mascara
+            for (int k = 0; k < 12; k++) {
+                float lado = (k % 2 == 0 ? 1.0f : -1.0f) * (0.45f + 0.25f * Aleatorio(k, 11));
+                glm::vec3 p = cam.Position + cam.Front * (0.5f + 0.4f * Aleatorio(k, 13)) + cam.Right * lado - cam.Up * 0.5f
+                            + Aleatorio3(k + (int)(t * 10)) * 0.08f;
+                burbujas.push_back({ p, 0.9f + Aleatorio(k, 3) * 0.6f, 0.006f + Aleatorio(k, 5) * 0.010f, Aleatorio(k, 9) * 6.0f });
+            }
         }
         // fuentes de burbujas de la zona (corales, fugas del submarino)
         fuenteTiempo += dt;
@@ -199,35 +249,70 @@ public:
             if (b.p.y > cfg.superficieY - 0.05f) { burbujas[i] = burbujas.back(); burbujas.pop_back(); }
             else i++;
         }
+        return exhalo;
     }
 
     // Pase de picking: dibuja los elementos interactivos con su color de ID y lee el centro.
+    // Pase de picking optimizado:
+    //  - solo se dibujan los objetos cuya esfera envolvente cruza el rayo de la mira
+    //  - solo se rasteriza un cuadrito alrededor del centro (glScissor)
+    //  - asistencia de punteria: si el centro no toca nada, se toma el objeto mas cercano al centro
     void Picking(const glm::mat4& proj, const glm::mat4& view, float t, int fbW, int fbH)
     {
+        glm::mat4 inv = glm::inverse(view);
+        glm::vec3 o = glm::vec3(inv[3]), d = -glm::normalize(glm::vec3(inv[2]));
+        int R = (int)(16.0f * fbH / 768.0f); if (R < 5) R = 5;
+        float tanMitad = 1.0f / proj[1][1];
+        float holgura = (R + 2) * 2.0f * tanMitad / (float)fbH;     // radio angular del cuadrito
+        int cx = fbW / 2, cy = fbH / 2;
+
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(cx - R, cy - R, 2 * R + 1, 2 * R + 1);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDisable(GL_BLEND);
         shPicking->use();
         shPicking->setMat4("projection", proj);
         shPicking->setMat4("view", view);
-        // el terreno tapa lo que esta detras (ID 0xFFFFFF = nada)
-        shPicking->setVec4("PickingColor", glm::vec4(1.0f));
+        shPicking->setVec4("PickingColor", glm::vec4(1.0f));       // el terreno tapa lo que esta detras
         shPicking->setMat4("model", glm::mat4(1.0f));
         terreno->Draw(*shPicking);
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
-            if (!e.visible) continue;
+            if (!e.visible || e.alpha < 0.35f && !e.interactivo) continue;
             unsigned int id = e.interactivo ? e.id : 0xFFFFFF;
-            shPicking->setVec4("PickingColor", glm::vec4((id & 0xFF) / 255.0f, ((id >> 8) & 0xFF) / 255.0f, ((id >> 16) & 0xFF) / 255.0f, 1.0f));
-            for (int k = 0; k < e.miembros; k++) {
-                shPicking->setMat4("model", Matriz(e, (int)i, k, t));
+            bool colorPuesto = false;
+            for (int k = 0; k < Visibles(e); k++) {
+                glm::mat4 M = Matriz(e, (int)i, k, t);
+                glm::vec3 c = glm::vec3(M[3]);
+                float r = e.radioBase * EscalaMax(M) * 1.1f;
+                glm::vec3 v = c - o;
+                float tca = glm::dot(v, d);
+                if (tca < -r) continue;
+                float rr = r + (tca > 0.0f ? tca : 0.0f) * holgura;
+                if (glm::dot(v, v) - tca * tca > rr * rr) continue;   // la esfera no toca el rayo de la mira
+                if (!colorPuesto) {
+                    shPicking->setVec4("PickingColor", glm::vec4((id & 0xFF) / 255.0f, ((id >> 8) & 0xFF) / 255.0f, ((id >> 16) & 0xFF) / 255.0f, 1.0f));
+                    colorPuesto = true;
+                }
+                shPicking->setMat4("model", M);
                 e.modelo->Draw(*shPicking);
             }
         }
-        unsigned char px[4];
-        glReadPixels(fbW / 2, fbH / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
-        unsigned int id = px[0] + px[1] * 256 + px[2] * 65536;
-        int nuevo = (id >= 1000 && id < 1000 + elementos.size()) ? (int)(id - 1000) : -1;
+        int lado = 2 * R + 1;
+        std::vector<unsigned char> px(lado * lado * 4);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(cx - R, cy - R, lado, lado, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+        glDisable(GL_SCISSOR_TEST);
+        int nuevo = -1, mejor = 1 << 30;
+        for (int y = 0; y < lado; y++)
+            for (int x = 0; x < lado; x++) {
+                const unsigned char* q = &px[(y * lado + x) * 4];
+                unsigned int id = q[0] + q[1] * 256 + q[2] * 65536;
+                if (id < 1000 || id >= 1000 + elementos.size()) continue;
+                int d2 = (x - R) * (x - R) + (y - R) * (y - R);
+                if (d2 < mejor) { mejor = d2; nuevo = (int)(id - 1000); }
+            }
         if (nuevo != seleccion) {
             seleccion = nuevo;
             if (seleccion >= 0) std::cout << "  Apuntando a: " << elementos[seleccion].etiqueta << std::endl;
@@ -343,6 +428,12 @@ public:
         glBindVertexArray(vaoVacio); glDrawArrays(GL_TRIANGLES, 0, 3); glBindVertexArray(0);
         glDepthMask(GL_TRUE);
 
+        // parametros del descarte por campo de vision y niebla
+        cullPos = cam.Position; cullFront = cam.Front;
+        float tanY = tanf(glm::radians(cam.Zoom) * 0.5f), aspecto = (float)fbW / (float)(fbH > 0 ? fbH : 1);
+        cullAngulo = atanf(tanY * sqrtf(1.0f + aspecto * aspecto));
+        cullDist = 3.3f / (cfg.densidad > 0.001f ? cfg.densidad : 0.001f);
+
         // 2) Terreno y elementos opacos
         glDisable(GL_BLEND);
         sh->use();
@@ -386,6 +477,7 @@ public:
         sh->setFloat("uSpecInt", 0.45f);
         sh->setFloat("uMetalico", 0.0f);
         for (const Burbuja& b : burbujas) {
+            if (!EnVista(b.p, b.r * 2.0f)) continue;
             glm::mat4 mb = glm::translate(glm::mat4(1.0f), b.p);
             mb = glm::scale(mb, glm::vec3(b.r * 2.0f));
             sh->setMat4("model", mb);
@@ -400,6 +492,7 @@ private:
     GLuint vaoVacio = 0, vaoQuad = 0, vboQuad = 0, cubo = 0;
     std::map<std::string, Model*> cache;
     std::vector<Elemento> elementos;
+    std::deque<AnimacionKF> animaciones;   // KF creadas por la zona (deque: punteros estables)
     std::vector<Burbuja> burbujas;
     std::vector<glm::vec3> fuentes;
     std::string terrenoArchivo, terrenoCarpeta;
@@ -408,6 +501,9 @@ private:
     std::vector<float> alturas;
     static const int N = 111;
     float respiracion = 3.0f, fuenteTiempo = 0.0f;
+public:
+    float velFauna = 0.5f;             // multiplica la velocidad de nado de toda la fauna (mas lento = mas facil de observar)
+private:
 
     // ------------------------------------------------------------ utilidades
     static float Aleatorio(int a, int b)
@@ -426,6 +522,30 @@ private:
         if (m->meshes.empty()) std::cout << "[Zonas] No se pudo cargar " << ruta << std::endl;
         cache[ruta] = m;
         return m;
+    }
+
+    static float RadioModelo(Model* m)
+    {
+        float r = 0.05f;
+        for (auto& me : m->meshes) for (auto& v : me.vertices) { float l = glm::length(v.Position); r = l > r ? l : r; }
+        return r;
+    }
+    static float EscalaMax(const glm::mat4& M)
+    {
+        float a = glm::length(glm::vec3(M[0])), b = glm::length(glm::vec3(M[1])), c = glm::length(glm::vec3(M[2]));
+        return a > b ? (a > c ? a : c) : (b > c ? b : c);
+    }
+    // Descarte: no se dibuja lo que esta fuera del campo de vision o tan lejos que la niebla lo oculta
+    glm::vec3 cullPos = glm::vec3(0.0f), cullFront = glm::vec3(0.0f, 0.0f, -1.0f);
+    float cullAngulo = 1.0f, cullDist = 300.0f;
+    bool EnVista(const glm::vec3& c, float r) const
+    {
+        glm::vec3 v = c - cullPos;
+        float dist = glm::length(v);
+        if (dist <= r) return true;
+        if (dist - r > cullDist) return false;
+        float ang = acosf(glm::clamp(glm::dot(v / dist, cullFront), -1.0f, 1.0f));
+        return ang < cullAngulo + asinf(r / dist) + 0.05f;
     }
 
     static float MedioLargo(Model* m)
@@ -458,13 +578,14 @@ private:
         switch (e.mov) {
         case MOV_FIJO:
             p.y += e.baseY + sinf(t * e.oscVel + e.fase) * e.oscAmp;
+            if (k > 0) { p += glm::vec3(off.x, 0.0f, off.z); yawUsar += k * 137.5f; }   // copias esparcidas (monedas)
             break;
         case MOV_KF:
-            if (e.kf) e.kf->PoseAt(t + e.fase, p, yawUsar, rotUsar, escUsar);
+            if (e.kf) e.kf->PoseAt(t - e.kfInicio + (e.kf->loop ? e.fase : 0.0f), p, yawUsar, rotUsar, escUsar);
             break;
         case MOV_ORBITA:
         case MOV_CARDUMEN: {
-            float a = t * e.vel + e.fase - (k > 0 ? (0.15f + 0.25f * Aleatorio(idx, k)) * signo * (float)(k % 7) * 0.3f : 0.0f);
+            float a = t * e.vel * velFauna + e.fase - (k > 0 ? (0.15f + 0.25f * Aleatorio(idx, k)) * signo * (float)(k % 7) * 0.3f : 0.0f);
             float r = e.radio + off.x;
             p = e.pos + glm::vec3(cosf(a) * r, off.y + sinf(t * e.oscVel + e.fase + k) * e.oscAmp, sinf(a) * r);
             p.y += e.baseY;
@@ -472,7 +593,7 @@ private:
             orientar = true;
             break; }
         case MOV_LIBRE: {
-            float a = t * e.vel + e.fase;
+            float a = t * e.vel * velFauna + e.fase;
             p = e.pos + glm::vec3(e.radio * sinf(a), sinf(t * e.oscVel + e.fase) * e.oscAmp, e.radio * 0.6f * sinf(2.0f * a)) + off;
             dir = glm::vec3(e.radio * cosf(a), 0.0f, e.radio * 1.2f * cosf(2.0f * a)) * signo;
             orientar = true;
@@ -489,8 +610,13 @@ private:
         if (rotUsar.x != 0.0f) M = glm::rotate(M, glm::radians(rotUsar.x), glm::vec3(1, 0, 0));
         if (rotUsar.y != 0.0f) M = glm::rotate(M, glm::radians(rotUsar.y), glm::vec3(0, 1, 0));
         if (rotUsar.z != 0.0f) M = glm::rotate(M, glm::radians(rotUsar.z), glm::vec3(0, 0, 1));
-        float s = escUsar * (k > 0 ? 0.85f + 0.3f * Aleatorio(idx, k + 50) : 1.0f);
-        return glm::scale(M, glm::vec3(s));
+        float s = escUsar * (k > 0 ? 0.85f + 0.3f * Aleatorio(idx, k + 50) : 1.0f) * (1.0f + 0.8f * e.inflado);
+        glm::vec3 sv(s);
+        if (e.pulsar) {   // la campana se contrae (mas angosta y alta) y se relaja
+            float pu = sinf(t * 2.2f + e.fase + k * 1.3f);
+            sv = glm::vec3(s * (1.0f - 0.10f * pu), s * (1.0f + 0.12f * pu), s * (1.0f - 0.10f * pu));
+        }
+        return glm::scale(M, sv);
     }
 
     void ConfigurarShader(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, const Camera* camBuzo = nullptr)
@@ -526,23 +652,44 @@ private:
         sh->setFloat("uEmision", emision);
         sh->setFloat("uResaltado", 0.0f);
         sh->setFloat("uBlanqueo", 0.0f);
+        sh->setFloat("uMuerte", 0.0f);
         sh->setFloat("uFantasma", 0.0f);
+        sh->setInt("uOndulaEje", 0);
         sh->setFloat("uSpecPower", 40.0f);
         sh->setFloat("uSpecInt", 0.25f);
         sh->setFloat("uMetalico", 0.0f);
     }
 
+    static int Visibles(const Elemento& e)
+    {
+        if (e.miembros <= 1) return 1;
+        int n = (int)ceilf(e.miembros * e.presencia);
+        return n < 1 ? 1 : (n > e.miembros ? e.miembros : n);
+    }
+
     void DibujarElemento(const Elemento& e, int idx, float t)
     {
-        Comunes(e.tinte, e.ondula, e.medioLargo, e.mecer, e.fase, e.alpha, e.emision);
+        glm::vec3 tinte = e.tinte;
+        if (e.camuflaje) {   // el pulpo alterna entre rojo, arena y moteado oscuro
+            float c = 0.5f + 0.5f * sinf(t * 0.35f + e.fase);
+            tinte = glm::mix(glm::vec3(1.25f, 0.95f, 0.85f), glm::vec3(0.75f, 0.55f, 0.45f), c);
+        }
+        Comunes(tinte, e.ondula, e.medioLargo, e.mecer, e.fase, e.alpha, e.emision);
         sh->setFloat("uSpecPower", e.specPower);
         sh->setFloat("uSpecInt", e.specInt);
         sh->setFloat("uMetalico", e.metalico);
         sh->setFloat("uVelNado", e.velNado);
+        sh->setFloat("uBlanqueo", e.blanqueo);
+        sh->setFloat("uMuerte", e.muerte);
+        sh->setInt("uOndulaEje", e.ondulaVertical ? 1 : 0);
+        sh->setFloat("uFantasma", e.fantasma);
         sh->setFloat("uResaltado", idx == seleccion ? 0.25f + 0.15f * sinf(t * 6.0f) : 0.0f);
-        for (int k = 0; k < e.miembros; k++) {
+        sh->setFloat("uVelNado", e.velNado * (0.4f + 0.6f * velFauna));
+        for (int k = 0; k < Visibles(e); k++) {
+            glm::mat4 M = Matriz(e, idx, k, t);
+            if (!EnVista(glm::vec3(M[3]), e.radioBase * EscalaMax(M) * 1.15f)) continue;
             sh->setFloat("uFase", e.fase + k * 1.3f);
-            sh->setMat4("model", Matriz(e, idx, k, t));
+            sh->setMat4("model", M);
             e.modelo->Draw(*sh);
         }
     }
@@ -587,74 +734,116 @@ private:
     {
         cfg = ZonaConfig();
         cfg.nombre = "Arrecifes";
-        cfg.niebla = glm::vec3(0.08f, 0.40f, 0.50f);
-        cfg.densidad = 0.020f;
-        cfg.solColor = glm::vec3(1.0f, 0.96f, 0.86f) * 1.25f;
+        cfg.niebla = glm::vec3(0.07f, 0.42f, 0.52f);
+        cfg.densidad = 0.018f;
+        cfg.solColor = glm::vec3(1.0f, 0.96f, 0.86f) * 1.35f;
         cfg.solDir = glm::vec3(-0.3f, -1.0f, -0.25f);
-        cfg.ambArriba = glm::vec3(0.36f, 0.56f, 0.62f);
-        cfg.ambAbajo = glm::vec3(0.12f, 0.22f, 0.26f);
-        cfg.causticas = 0.9f;
-        cfg.superficieY = 18.0f;
-        cfg.inicioCamara = glm::vec3(0.0f, 6.0f, 22.0f);
+        cfg.ambArriba = glm::vec3(0.38f, 0.58f, 0.64f);
+        cfg.ambAbajo = glm::vec3(0.13f, 0.23f, 0.27f);
+        cfg.causticas = 1.0f;
+        cfg.superficieY = 14.0f;                       // arrecife somero, lleno de luz
+        cfg.inicioCamara = glm::vec3(0.0f, 8.0f, 20.0f);
         terrenoArchivo = "terreno_arrecifes"; terrenoCarpeta = "arrecifes";
         const char* c = "arrecifes";
 
-        std::vector<glm::vec3> vivos = { {1.0f,0.45f,0.60f}, {0.72f,0.42f,0.95f}, {1.0f,0.58f,0.28f}, {1.0f,0.85f,0.35f}, {0.30f,0.85f,0.80f}, {0.95f,0.35f,0.30f} };
-        Elemento roca = Fijo("roca_arrecife", c, glm::vec3(0.0f, -0.4f, 0.0f), 0, 1); roca.etiqueta = "Roca";
-        Esparcir(roca, 12, glm::vec2(0.0f), 4.0f, 32.0f, 0.8f, 2.6f, 11);
-        // tres parches de arrecife
-        glm::vec2 parches[] = { {-6.0f, -4.0f}, {7.0f, -10.0f}, {-2.0f, 9.0f} };
-        for (int p = 0; p < 3; p++) {
-            Elemento r1 = Fijo("coral_rama1", c, glm::vec3(0.0f, -0.1f, 0.0f), 0, 1); r1.interactivo = true; r1.etiqueta = "Coral";
+        std::vector<glm::vec3> vivos = { {1.0f,0.42f,0.58f}, {0.72f,0.40f,0.95f}, {1.0f,0.56f,0.26f}, {1.0f,0.84f,0.32f}, {0.28f,0.85f,0.78f}, {0.95f,0.33f,0.30f} };
+        Elemento roca = Fijo("roca_arrecife", c, glm::vec3(0.0f, -0.4f, 0.0f), 0, 1); roca.etiqueta = "Roca"; roca.interactivo = true;
+        Esparcir(roca, 14, glm::vec2(0.0f), 4.0f, 32.0f, 0.8f, 2.6f, 11);
+
+        // 22 Fondo + 10/11/12 corales en cuatro parches de arrecife
+        glm::vec2 parches[] = { {-6.0f, -4.0f}, {7.0f, -9.0f}, {-1.0f, 8.0f}, {12.0f, 4.0f} };
+        for (int p = 0; p < 4; p++) {
+            Elemento r1 = Fijo("coral_rama1", c, glm::vec3(0.0f, -0.1f, 0.0f), 0, 1);
+            r1.interactivo = true; r1.etiqueta = "Coral ramificado"; r1.esCoral = true;
             Elemento r2 = r1; r2.archivo = "coral_rama2";
-            Elemento ce = Fijo("coral_cerebro", c, glm::vec3(0.0f, -0.15f, 0.0f), 0, 1); ce.interactivo = true; ce.etiqueta = "Coral";
-            Elemento ab = Fijo("coral_abanico", c, glm::vec3(0.0f, -0.1f, 0.0f), 0, 1); ab.interactivo = true; ab.etiqueta = "Coral"; ab.mecer = 0.15f;
-            Esparcir(r1, 8, parches[p], 0.0f, 5.0f, 1.0f, 2.4f, 20 + p * 10, vivos);
-            Esparcir(r2, 7, parches[p], 0.0f, 5.5f, 1.0f, 2.2f, 21 + p * 10, vivos);
+            Elemento ce = Fijo("coral_cerebro", c, glm::vec3(0.0f, -0.15f, 0.0f), 0, 1);
+            ce.interactivo = true; ce.etiqueta = "Coral cerebro"; ce.esCoral = true;
+            Elemento ab = Fijo("coral_abanico", c, glm::vec3(0.0f, -0.1f, 0.0f), 0, 1);
+            ab.interactivo = true; ab.etiqueta = "Abanico de mar"; ab.mecer = 0.15f; ab.esCoral = true;
+            Elemento es = Fijo("esponja_tubo", c, glm::vec3(0.0f, -0.05f, 0.0f), 0, 1);
+            es.interactivo = true; es.etiqueta = "Esponja de tubo";
+            Esparcir(r1, 7, parches[p], 0.0f, 5.0f, 1.0f, 2.4f, 20 + p * 10, vivos);
+            Esparcir(r2, 6, parches[p], 0.0f, 5.5f, 1.0f, 2.2f, 21 + p * 10, vivos);
             Esparcir(ce, 5, parches[p], 0.5f, 5.0f, 0.8f, 1.8f, 22 + p * 10, vivos);
             Esparcir(ab, 3, parches[p], 1.0f, 5.0f, 1.2f, 2.0f, 23 + p * 10, { {0.85f,0.30f,0.75f}, {1.0f,0.55f,0.30f} });
+            Esparcir(es, 2, parches[p], 1.5f, 4.5f, 0.8f, 1.3f, 24 + p * 10, { {0.75f,0.45f,0.95f}, {1.0f,0.78f,0.30f}, {0.95f,0.50f,0.35f} });
+            Elemento rs = r1; rs.archivo = "coral_rama_santiago";        // coral ramificado modelado por Santiago
+            Esparcir(rs, 4, parches[p], 0.5f, 5.0f, 0.9f, 1.5f, 25 + p * 10, vivos);
         }
-        Elemento alga = Fijo("alga", c, glm::vec3(0.0f, -0.1f, 0.0f), 0, 1); alga.mecer = 1.0f; alga.etiqueta = "Alga";
-        Esparcir(alga, 26, glm::vec2(-14.0f, 8.0f), 0.0f, 7.0f, 0.7f, 1.6f, 50, { {0.9f,1.0f,0.8f}, {0.7f,0.9f,0.6f}, {1.0f,0.9f,0.7f} });
-        Esparcir(alga, 18, glm::vec2(16.0f, 6.0f), 0.0f, 6.0f, 0.7f, 1.4f, 51);
+        for (size_t i = 0; i < elementos.size(); i++)
+            if (elementos[i].esCoral) elementos[i].sensibilidad = 0.6f + 0.9f * Aleatorio(91, (int)i);
 
-        Elemento almeja = Fijo("almejagigante", c, glm::vec3(3.0f, 0.2f, -2.0f), 30, 1.0f); almeja.interactivo = true; almeja.etiqueta = "Almeja gigante";
-        almeja.mov = MOV_KF; almeja.kf = &KF_Almeja();   // KF #4: abre/cierra la concha
-        elementos.push_back(almeja);
-        almeja.pos = glm::vec3(-9.0f, 0.2f, 3.0f); almeja.yaw = 200; almeja.escala = 0.8f; elementos.push_back(almeja);
-        Elemento cangrejo = Fijo("cangrejoermitano", c, glm::vec3(1.5f, 0.15f, 4.0f), 120, 1.0f); cangrejo.interactivo = true; cangrejo.etiqueta = "Cangrejo ermitano";
-        elementos.push_back(cangrejo);
-        cangrejo.pos = glm::vec3(-3.0f, 0.15f, 12.0f); cangrejo.yaw = 40; elementos.push_back(cangrejo);
-        Elemento caballito = Fijo("CaballitoMar", c, glm::vec3(-13.0f, 2.0f, 8.0f), 70, 1.0f); caballito.interactivo = true; caballito.etiqueta = "Caballito de mar";
-        caballito.oscAmp = 0.25f; caballito.oscVel = 0.8f; caballito.sobreSuelo = true;
-        elementos.push_back(caballito);
-        caballito.pos = glm::vec3(-15.5f, 1.6f, 6.0f); caballito.yaw = 250; caballito.fase = 2.0f; elementos.push_back(caballito);
-
-        Elemento payasos = Nadador("PezPayaso", c, MOV_CARDUMEN, glm::vec3(-6.0f, 2.2f, -4.0f), 3.0f, 0.5f, "Pez payaso");
-        payasos.miembros = 7; payasos.dispersion = 0.8f; payasos.velNado = 12.0f; payasos.sobreSuelo = true;
+        // 16 Anemonas con 18 peces payaso
+        glm::vec3 anem[] = { {-5.4f, 0.0f, -3.0f}, {-6.9f, 0.0f, -4.6f}, {-5.7f, 0.0f, -5.6f} };
+        glm::vec3 tAnem[] = { {1.0f, 0.55f, 0.75f}, {0.6f, 1.0f, 0.65f}, {0.85f, 0.6f, 1.0f} };
+        for (int i = 0; i < 3; i++) {
+            Elemento a = Fijo("anemona", c, anem[i], (float)(i * 70), 1.3f);
+            a.mecer = 0.8f; a.tinte = tAnem[i]; a.interactivo = true; a.etiqueta = "Anemona"; a.esCoral = true; a.sensibilidad = 0.9f; a.fase = (float)i;
+            elementos.push_back(a);
+        }
+        Elemento payasos = Nadador("PezPayaso", c, MOV_CARDUMEN, glm::vec3(-6.0f, 0.9f, -4.4f), 1.1f, 0.6f, "Pez payaso");
+        payasos.miembros = 6; payasos.dispersion = 0.5f; payasos.velNado = 12.0f; payasos.sobreSuelo = true; payasos.oscAmp = 0.2f;
         elementos.push_back(payasos);
-        Elemento cirujanos = Nadador("Pezcirujano", c, MOV_CARDUMEN, glm::vec3(7.0f, 3.0f, -10.0f), 4.5f, -0.4f, "Pez cirujano azul");
-        cirujanos.miembros = 6; cirujanos.dispersion = 1.0f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true;
+
+        // 17 Pradera de pasto marino con 08 manati y 03 caballitos de mar
+        Elemento pasto = Fijo("pasto_marino", c, glm::vec3(0.0f, -0.05f, 0.0f), 0, 1);
+        pasto.mecer = 1.6f; pasto.interactivo = true; pasto.etiqueta = "Pasto marino";
+        Esparcir(pasto, 70, glm::vec2(-17.0f, 10.0f), 0.0f, 9.0f, 0.8f, 1.6f, 60, { {1.0f,1.0f,1.0f}, {0.85f,1.0f,0.8f}, {1.1f,1.05f,0.85f} });
+        Elemento manati = Nadador("manati", c, MOV_ORBITA, glm::vec3(-17.0f, 1.8f, 10.0f), 6.0f, -0.07f, "Manati");
+        manati.ondula = 0.05f; manati.velNado = 2.0f; manati.sobreSuelo = true; manati.ondulaVertical = true; elementos.push_back(manati);
+        Elemento caballito = Fijo("CaballitoMar", c, glm::vec3(-14.0f, 0.7f, 7.5f), 70, 1.0f);
+        caballito.interactivo = true; caballito.etiqueta = "Caballito de mar"; caballito.oscAmp = 0.2f; caballito.oscVel = 0.8f;
+        elementos.push_back(caballito);
+        caballito.pos = glm::vec3(-19.5f, 0.9f, 12.0f); caballito.yaw = 250; caballito.fase = 2.0f; elementos.push_back(caballito);
+        caballito.pos = glm::vec3(-16.0f, 0.6f, 14.0f); caballito.yaw = 130; caballito.fase = 4.0f; elementos.push_back(caballito);
+
+        // 07 Almejas, 05 pulpo y 15 langostas en el fondo
+        Elemento almeja = Fijo("almejagigante", c, glm::vec3(7.5f, 0.2f, -6.0f), 30, 1.0f);
+        almeja.interactivo = true; almeja.etiqueta = "Almeja gigante"; almeja.esCoral = true; almeja.sensibilidad = 0.7f;
+        almeja.tinte = glm::vec3(0.75f, 0.85f, 1.15f);
+        {   // KF: la almeja abre y cierra la concha (animacion por cuadros clave de Julian)
+            Elemento ak = almeja;
+            ak.mov = MOV_KF; ak.kf = GuardarKF(KF_AlmejaAbre(glm::vec3(7.5f, AlturaSuelo(7.5f, -6.0f) + 0.2f, -6.0f)));
+            elementos.push_back(ak);
+        }
+        almeja.pos = glm::vec3(-2.5f, 0.2f, 11.5f); almeja.yaw = 200; almeja.escala = 0.8f; elementos.push_back(almeja);
+        Elemento pulpo = Fijo("pulpo", c, glm::vec3(2.0f, 0.0f, 4.0f), 220, 1.0f);
+        pulpo.interactivo = true; pulpo.etiqueta = "Pulpo"; pulpo.camuflaje = true; pulpo.mecer = 0.3f; pulpo.fase = 1.0f;
+        elementos.push_back(pulpo);
+        Elemento langosta = Fijo("langosta", c, glm::vec3(9.0f, 0.02f, -6.5f), 160, 1.0f);
+        langosta.interactivo = true; langosta.etiqueta = "Langosta";
+        elementos.push_back(langosta);
+        langosta.pos = glm::vec3(-3.5f, 0.02f, 10.5f); langosta.yaw = 20; elementos.push_back(langosta);
+        langosta.pos = glm::vec3(13.5f, 0.02f, 2.0f); langosta.yaw = 300; elementos.push_back(langosta);
+
+        // 21 Respiradero hidrotermal
+        Elemento resp = Fijo("respiradero", c, glm::vec3(18.0f, -0.3f, -15.0f), 20, 1.2f);
+        resp.interactivo = true; resp.etiqueta = "Respiradero hidrotermal";
+        elementos.push_back(resp);
+
+        // Fauna que nada
+        Elemento cirujanos = Nadador("Pezcirujano", c, MOV_CARDUMEN, glm::vec3(7.0f, 2.6f, -9.0f), 4.0f, -0.4f, "Pez cirujano azul");
+        cirujanos.miembros = 7; cirujanos.dispersion = 1.0f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true;
         elementos.push_back(cirujanos);
-        Elemento dragon = Nadador("pezdracoide", c, MOV_ORBITA, glm::vec3(-2.0f, 2.0f, 9.0f), 3.0f, 0.35f, "Pez dragon");
-        dragon.sobreSuelo = true; elementos.push_back(dragon);
-        Elemento atunes = Nadador("pescado", c, MOV_CARDUMEN, glm::vec3(0.0f, 9.0f, 0.0f), 24.0f, 0.18f, "Atun");
-        atunes.miembros = 14; atunes.dispersion = 2.5f; atunes.velNado = 9.0f; atunes.ondula = 0.08f;
-        elementos.push_back(atunes);
-        Elemento tortuga = Nadador("tortuga", c, MOV_ORBITA, glm::vec3(0.0f, 6.0f, -2.0f), 13.0f, 0.10f, "Tortuga marina");
-        tortuga.ondula = 0.0f;
-        tortuga.oscAmp = 1.0f;
-        tortuga.oscVel = 0.3f; 
-        // Corrección inicial de orientación
-        tortuga.rotExtra = glm::vec3(-90.0f, 0.0f, -90.0f);
-
-        elementos.push_back(tortuga);
-        Elemento manta = Nadador("mantaraya", c, MOV_LIBRE, glm::vec3(0.0f, 10.0f, -6.0f), 22.0f, 0.06f, "Mantarraya");
+        Elemento globo = Nadador("pez_globo", c, MOV_ORBITA, glm::vec3(-1.0f, 1.8f, 8.0f), 2.5f, 0.25f, "Pez globo");
+        globo.inflable = true; globo.sobreSuelo = true; globo.ondula = 0.03f; globo.oscAmp = 0.3f; elementos.push_back(globo);
+        globo.pos = glm::vec3(12.0f, 2.2f, 4.0f); globo.vel = -0.2f; globo.fase = 2.0f; elementos.push_back(globo);
+        globo.pos = glm::vec3(1.0f, 2.5f, -1.0f); globo.radio = 4.0f; globo.vel = 0.15f; globo.fase = 4.0f; elementos.push_back(globo);
+        Elemento tortuga = Nadador("tortuga", c, MOV_ORBITA, glm::vec3(0.0f, 4.5f, 0.0f), 11.0f, 0.09f, "Tortuga marina");
+        tortuga.ondula = 0.0f; tortuga.oscAmp = 1.0f; tortuga.oscVel = 0.3f; elementos.push_back(tortuga);
+        tortuga.pos = glm::vec3(-12.0f, 3.5f, 6.0f); tortuga.radio = 7.0f; tortuga.vel = -0.11f; tortuga.fase = 2.5f; tortuga.escala = 0.85f; elementos.push_back(tortuga);
+        Elemento manta = Nadador("mantaraya", c, MOV_LIBRE, glm::vec3(0.0f, 8.0f, -6.0f), 22.0f, 0.06f, "Mantarraya");
         manta.ondula = 0.0f; manta.oscAmp = 1.5f; manta.oscVel = 0.25f; elementos.push_back(manta);
-        Elemento manati = Nadador("manati", c, MOV_ORBITA, glm::vec3(4.0f, 2.8f, 4.0f), 20.0f, -0.05f, "Manati");
-        manati.ondula = 0.05f; manati.velNado = 2.0f; manati.sobreSuelo = true; elementos.push_back(manati);
+        Elemento delfines = Nadador("delfin", c, MOV_CARDUMEN, glm::vec3(0.0f, 10.5f, 0.0f), 24.0f, 0.22f, "Delfin nariz de botella");
+        delfines.miembros = 3; delfines.dispersion = 2.0f; delfines.ondula = 0.12f; delfines.velNado = 5.0f; delfines.ondulaVertical = true;
+        delfines.oscAmp = 1.2f; delfines.oscVel = 0.9f; elementos.push_back(delfines);
+        Elemento barracudas = Nadador("barracuda", "naufragios", MOV_CARDUMEN, glm::vec3(4.0f, 6.0f, 2.0f), 16.0f, -0.16f, "Barracuda");
+        barracudas.miembros = 4; barracudas.dispersion = 1.5f; elementos.push_back(barracudas);
+        Elemento vaquita = Nadador("vacamarina", "naufragios", MOV_ORBITA, glm::vec3(6.0f, 3.5f, 10.0f), 9.0f, 0.16f, "Vaquita marina");
+        vaquita.ondula = 0.08f; vaquita.velNado = 4.0f; vaquita.sobreSuelo = true; vaquita.ondulaVertical = true; elementos.push_back(vaquita);
 
-        fuentes = { glm::vec3(-6.0f, 0.4f, -4.0f), glm::vec3(7.0f, 0.4f, -10.0f) };
+        // 23 Burbujas: respiradero y grietas del arrecife
+        fuentes = { glm::vec3(18.0f, 3.6f, -15.0f), glm::vec3(18.4f, 2.4f, -14.4f), glm::vec3(-6.0f, 0.4f, -4.0f) };
     }
 
     // ------------------------------------------------------------ Zona 2
@@ -714,7 +903,7 @@ private:
         elementos.push_back(morsa);
         morsa.pos = glm::vec3(-5.0f, 0.5f, -9.0f); morsa.yaw = 150; morsa.escala = 0.9f; elementos.push_back(morsa);
         Elemento krill = Nadador("Krill", c, MOV_CARDUMEN, glm::vec3(-4.0f, 6.0f, -6.0f), 5.0f, 0.25f, "Krill");
-        krill.miembros = 90; krill.dispersion = 2.5f; krill.escala = 1.4f; krill.ondula = 0.0f; krill.oscAmp = 0.6f;
+        krill.miembros = 60; krill.dispersion = 2.5f; krill.escala = 1.4f; krill.ondula = 0.0f; krill.oscAmp = 0.6f;
         elementos.push_back(krill);
         Elemento bacalaos = Nadador("bacalao", c, MOV_CARDUMEN, glm::vec3(6.0f, 3.5f, 6.0f), 8.0f, -0.3f, "Bacalao");
         bacalaos.miembros = 9; bacalaos.dispersion = 1.6f; bacalaos.sobreSuelo = true; elementos.push_back(bacalaos);
@@ -726,76 +915,155 @@ private:
     {
         cfg = ZonaConfig();
         cfg.nombre = "Naufragios";
-        cfg.niebla = glm::vec3(0.025f, 0.075f, 0.075f);
-        cfg.densidad = 0.040f;
-        cfg.solColor = glm::vec3(0.40f, 0.55f, 0.50f) * 0.6f;
+        cfg.niebla = glm::vec3(0.035f, 0.075f, 0.060f);   // agua turbia: empieza oscura y se aclara al limpiar
+        cfg.densidad = 0.045f;
+        cfg.solColor = glm::vec3(0.40f, 0.52f, 0.46f) * 0.6f;
         cfg.solDir = glm::vec3(0.1f, -1.0f, 0.1f);
-        cfg.ambArriba = glm::vec3(0.13f, 0.21f, 0.20f);
-        cfg.ambAbajo = glm::vec3(0.02f, 0.04f, 0.05f);
-        cfg.causticas = 0.06f;
+        cfg.ambArriba = glm::vec3(0.12f, 0.18f, 0.16f);
+        cfg.ambAbajo = glm::vec3(0.02f, 0.04f, 0.04f);
+        cfg.causticas = 0.05f;
         cfg.superficieY = 22.0f;
         cfg.linterna = true;
-        cfg.inicioCamara = glm::vec3(0.0f, 5.0f, 18.0f);
+        cfg.inicioCamara = glm::vec3(0.0f, 5.0f, 22.0f);
         terrenoArchivo = "terreno_naufragios"; terrenoCarpeta = "naufragios";
         const char* c = "naufragios";
+        auto suelo = [&](float x, float z) { return AlturaSuelo(x, z); };
+        auto fijo = [&](const char* archivo, glm::vec3 p, float yaw, float esc, const char* etiqueta) {
+            Elemento e = Fijo(archivo, c, p, yaw, esc); e.interactivo = etiqueta != nullptr; if (etiqueta) e.etiqueta = etiqueta; return e;
+        };
 
-        Elemento sub = Fijo("submarino", c, glm::vec3(5.0f, 0.6f, -4.0f), 25, 1.0f);
-        sub.interactivo = true; sub.etiqueta = "Submarino hundido";
-        sub.mov = MOV_KF; sub.kf = &KF_Submarino();   // KF #2: se asienta con escora
-        MatMetalico(sub);
-        elementos.push_back(sub);
-        // ruinas
-        float colX[] = { -14.0f, -10.0f, -14.0f, -10.0f };
-        float colZ[] = { -3.0f, -3.0f, 3.0f, 3.0f };
+        // ---------------- 57 fondo de grava (terreno) + rocas
+        Elemento roca = fijo("roca_naufragio", glm::vec3(0.0f, -0.4f, 0.0f), 0, 1, "Roca"); MatOpaco(roca);
+        Esparcir(roca, 12, glm::vec2(0.0f), 7.0f, 32.0f, 0.8f, 2.4f, 14);
+
+        // ---------------- letreros informativos
+        struct L { const char* a; glm::vec3 p; float yaw; const char* et; };
+        L letreros[] = { { "letrero_bienvenida", {0.0f, 0.0f, 15.0f}, 0.0f, "Letrero: como limpiar" },
+                         { "letrero_plasticos", {6.5f, 0.0f, 9.0f}, -35.0f, "Letrero: plasticos" },
+                         { "letrero_redes", {0.5f, 0.0f, -8.5f}, -15.0f, "Letrero: redes fantasma" },
+                         { "letrero_invasor", {-8.0f, 0.0f, 3.5f}, 60.0f, "Letrero: pez leon" },
+                         { "letrero_toxicos", {12.5f, 0.0f, 5.0f}, -45.0f, "Letrero: residuos toxicos" } };
+        for (auto& l : letreros) { Elemento e = fijo(l.a, l.p, l.yaw, 1.15f, l.et); MatOpaco(e); e.emision = 0.25f; elementos.push_back(e); }
+
+        // ---------------- 52 submarino hundido: se asienta en el fondo al llegar (KF, una vez)
+        Elemento sub = fijo("submarino", glm::vec3(0.0f), 25, 1.0f, "Submarino hundido");
+        sub.mov = MOV_KF; sub.kf = GuardarKF([&]() { AnimacionKF a = KF_SubmarinoAsienta(glm::vec3(3.0f, suelo(5.4f, -4.4f) + 0.1f, -2.0f)); a.loop = false; return a; }());
+        sub.kfInicio = 1.5f; MatMetalico(sub); elementos.push_back(sub);
+
+        // ---------------- 53/54 ruinas: muro con arcos, torre y columnas
+        Elemento muro = fijo("ruinas_muro", glm::vec3(-16.0f, -0.4f, -1.0f), 90, 1.0f, "Ruinas"); MatOpaco(muro); elementos.push_back(muro);
+        Elemento torre = fijo("ruinas_torre", glm::vec3(-18.0f, -0.6f, 9.0f), 20, 0.9f, "Ruinas"); MatOpaco(torre); elementos.push_back(torre);
+        float colX[] = { -12.0f, -9.0f, -12.0f, -9.0f }, colZ[] = { -4.0f, -4.0f, 3.0f, 3.0f };
         for (int i = 0; i < 4; i++) {
-            Elemento col = Fijo(i == 2 ? "columna_rota" : "columna", c, glm::vec3(colX[i], -0.3f, colZ[i]), (float)(i * 37), 1.0f);
-            col.interactivo = true; col.etiqueta = "Ruinas"; elementos.push_back(col);
+            Elemento col = fijo(i == 2 ? "columna_rota" : "columna", glm::vec3(colX[i], -0.3f, colZ[i]), (float)(i * 37), 1.0f, "Columna");
+            MatOpaco(col); elementos.push_back(col);
         }
-        Elemento caida = Fijo("columna", c, glm::vec3(-6.0f, 0.3f, 6.0f), 75, 0.9f);
-        caida.interactivo = true; caida.etiqueta = "Ruina caida";
-        caida.mov = MOV_KF; caida.kf = &KF_Columna();   // KF #3: cae, rebota y se posa
-        elementos.push_back(caida);
-        Elemento bloque = Fijo("bloque", c, glm::vec3(0.0f, 0.2f, 0.0f), 0, 1); bloque.etiqueta = "Ruinas"; bloque.interactivo = true;
-        Esparcir(bloque, 9, glm::vec2(-12.0f, 0.0f), 2.0f, 8.0f, 0.7f, 1.3f, 13);
-        Elemento roca = Fijo("roca_naufragio", c, glm::vec3(0.0f, -0.4f, 0.0f), 0, 1); roca.etiqueta = "Roca";
-        Esparcir(roca, 12, glm::vec2(0.0f), 6.0f, 30.0f, 0.8f, 2.4f, 14);
+        Elemento caida = fijo("columna", glm::vec3(0.0f), 0, 0.9f, "Columna");   // se derrumba cuando te acercas (KF)
+        caida.mov = MOV_KF; caida.kf = GuardarKF(KF_ColumnaDerrumbe(glm::vec3(-5.5f, suelo(-5.5f, 7.0f) - 0.2f, 7.0f), 75.0f));
+        caida.kfInicio = 1e6f; MatOpaco(caida); elementos.push_back(caida);
+        Elemento bloque = fijo("bloque", glm::vec3(0.0f, 0.2f, 0.0f), 0, 1, "Ruinas"); MatOpaco(bloque);
+        Esparcir(bloque, 8, glm::vec2(-13.0f, 1.0f), 2.0f, 8.0f, 0.7f, 1.3f, 13);
 
-        // basura: en el fondo y a la deriva (se recoge con clic)
-        auto basura = [&](const char* archivo, const char* etiqueta, int n, int semilla, bool deriva, float altura, glm::vec2 centro, float radio) {
+        // ---------------- 51 ancla, 66 timon, 74 senal de transito, 49 dron
+        Elemento ancla = fijo("ancla", glm::vec3(2.0f, -0.35f, -10.0f), 60, 1.0f, "Ancla oxidada"); ancla.rotExtra = glm::vec3(0.0f, 0.0f, -38.0f); MatMetalico(ancla); elementos.push_back(ancla);
+        Elemento barco = fijo("BarcoRuinas", glm::vec3(-8.0f, 2.0f, -21.0f), 20, 1.0f, "Barco hundido");   // modelo de Julian
+        MatOpaco(barco); elementos.push_back(barco);
+        Elemento timon = fijo("timon", glm::vec3(-13.6f, 0.45f, -6.5f), 30, 1.0f, "Timon"); timon.rotExtra = glm::vec3(72.0f, 0.0f, 0.0f); MatOpaco(timon); elementos.push_back(timon);
+        Elemento senal = fijo("senal", glm::vec3(-6.5f, -0.25f, 11.0f), 200, 1.0f, "Senal de transito"); senal.rotExtra = glm::vec3(0.0f, 0.0f, 24.0f); MatMetalico(senal); elementos.push_back(senal);
+        Elemento dron = fijo("dron", cfg.inicioCamara + glm::vec3(-1.5f, 0.0f, -2.6f), 0, 0.55f, "Dron de exploracion");
+        dron.sobreSuelo = false; dron.emision = 0.3f; MatPlastico(dron); dron.oscAmp = 0.08f; dron.oscVel = 1.6f; elementos.push_back(dron);
+
+        // ---------------- 55/56 cofre del tesoro (se abre al limpiar todo) y monedas
+        glm::vec3 pc(1.5f, suelo(1.5f, 5.0f) - 0.05f, 5.0f);
+        Elemento cofre = fijo("cofre", glm::vec3(pc.x, -0.05f, pc.z), 0, 1.0f, "Cofre del tesoro"); MatOpaco(cofre); elementos.push_back(cofre);
+        Elemento tapa = fijo("cofre_tapa", glm::vec3(0.0f), 0, 1.0f, "Cofre del tesoro");
+        tapa.mov = MOV_KF; tapa.kf = GuardarKF(KF_TapaCofre(pc + glm::vec3(0.0f, 0.5f, -0.3f), 0.0f)); tapa.kfInicio = 1e6f; MatOpaco(tapa);
+        elementos.push_back(tapa);
+        Elemento monedas = fijo("moneda", glm::vec3(pc.x + 0.7f, 0.0f, pc.z + 0.5f), 0, 1.0f, nullptr);
+        monedas.miembros = 30; monedas.dispersion = 0.9f; monedas.presencia = 0.25f; monedas.emision = 0.35f; MatMetalico(monedas); elementos.push_back(monedas);
+
+        // ---------------- residuos (se recogen con clic)
+        auto residuo = [&](const char* archivo, const char* etiqueta, int tipo, float peso, int n, int semilla, bool deriva, float altura, glm::vec2 centro, float radio, float escala) {
             for (int i = 0; i < n; i++) {
-                Elemento b = Fijo(archivo, c, glm::vec3(0.0f), 0, 1.0f);
-                float a = Aleatorio(semilla, i) * 6.28f, r = radio * sqrtf(Aleatorio(semilla + 1, i));
-                b.pos = glm::vec3(centro.x + cosf(a) * r, altura, centro.y + sinf(a) * r);
-                b.yaw = Aleatorio(semilla + 2, i) * 360.0f;
-                b.rotExtra = deriva ? glm::vec3(0.0f) : glm::vec3((Aleatorio(semilla + 3, i) - 0.5f) * 40.0f, 0.0f, (Aleatorio(semilla + 4, i) > 0.5f ? 90.0f : 0.0f));
+                float a = Aleatorio(semilla, i) * 6.28f, r = 2.0f + radio * sqrtf(Aleatorio(semilla + 1, i));
+                Elemento b = fijo(archivo, glm::vec3(centro.x + cosf(a) * r, altura, centro.y + sinf(a) * r), Aleatorio(semilla + 2, i) * 360.0f, 1.0f, etiqueta);
+                if (!deriva) b.rotExtra = glm::vec3((Aleatorio(semilla + 3, i) - 0.5f) * 30.0f, 0.0f, Aleatorio(semilla + 4, i) > 0.4f ? 88.0f : 0.0f);
                 b.mov = deriva ? MOV_DERIVA : MOV_FIJO; b.fase = (float)i * 1.7f;
-                b.interactivo = true; b.basura = true; b.etiqueta = etiqueta;
-                if (std::string(archivo) == "bolsaplastico") MatPlastico(b);
-                else MatMetalico(b);   // latas y llantas
+                b.basura = true; b.residuo = tipo; b.peso = peso; b.escala = escala;   // mas grandes que en la realidad: faciles de ver y tomar
                 elementos.push_back(b);
             }
         };
-        basura("lata", "Lata de aluminio", 7, 80, false, 0.08f, glm::vec2(2.0f, 2.0f), 14.0f);
-        basura("lataaplastada", "Lata aplastada", 5, 81, false, 0.06f, glm::vec2(-4.0f, 0.0f), 12.0f);
-        basura("Llanta", "Llanta", 3, 82, false, 0.15f, glm::vec2(4.0f, 6.0f), 10.0f);
-        basura("bolsaplastico", "Bolsa de plastico", 7, 83, true, 3.0f, glm::vec2(0.0f, 0.0f), 16.0f);
-        // KF #5: una bolsa recorriendo 5 puntos de flotación (además de las de deriva)
-        Elemento bolsaKF = Fijo("bolsaplastico", c, glm::vec3(-2.0f, 2.5f, 4.0f), 0, 1.0f);
-        bolsaKF.mov = MOV_KF; bolsaKF.kf = &KF_Bolsa();
-        bolsaKF.interactivo = true; bolsaKF.basura = true; bolsaKF.etiqueta = "Bolsa de plastico";
-        MatPlastico(bolsaKF);
+        size_t ini = elementos.size();
+        residuo("bolsaplastico", "Bolsa de plastico", 1, 1.0f, 6, 83, true, 3.0f, glm::vec2(0.0f, 0.0f), 16.0f, 1.5f);
+        residuo("botella", "Botella PET", 1, 1.0f, 4, 84, true, 2.5f, glm::vec2(2.0f, 3.0f), 14.0f, 1.8f);
+        residuo("botella", "Botella PET", 1, 1.0f, 3, 85, false, 0.07f, glm::vec2(-3.0f, -2.0f), 12.0f, 1.8f);
+        residuo("bota", "Bota de hule", 1, 1.0f, 3, 86, false, 0.08f, glm::vec2(-10.0f, 4.0f), 8.0f, 1.5f);
+        residuo("Llanta", "Llanta", 1, 2.0f, 3, 82, false, 0.15f, glm::vec2(4.0f, 6.0f), 10.0f, 1.0f);
+        residuo("lata", "Lata de aluminio", 2, 1.0f, 7, 80, false, 0.14f, glm::vec2(2.0f, 2.0f), 14.0f, 1.9f);
+        residuo("lataaplastada", "Lata aplastada", 2, 1.0f, 5, 81, false, 0.10f, glm::vec2(-4.0f, 0.0f), 12.0f, 2.0f);
+        residuo("pila", "Pila", 3, 1.0f, 6, 87, false, 0.06f, glm::vec2(6.0f, -2.0f), 10.0f, 2.5f);
+        for (size_t i = ini; i < elementos.size(); i++) {
+            Elemento& b = elementos[i];
+            if (b.archivo == "lata" || b.archivo == "lataaplastada" || b.archivo == "pila") MatMetalico(b);
+            else if (b.archivo == "bolsaplastico") { b.alpha = 0.55f; MatTraslucido(b); }
+            else if (b.archivo == "botella") { b.alpha = 0.65f; MatTraslucido(b); b.fantasma = 0.15f; }
+            else MatPlastico(b);
+        }
+        Elemento bolsaKF = fijo("bolsaplastico", glm::vec3(0.0f), 0, 1.0f, "Bolsa de plastico");   // KF de Julian: recorre puntos de flotacion
+        bolsaKF.mov = MOV_KF; bolsaKF.kf = &KF_Bolsa(); bolsaKF.escala = 1.5f; bolsaKF.basura = true; bolsaKF.residuo = 1; bolsaKF.alpha = 0.55f; MatTraslucido(bolsaKF);
         elementos.push_back(bolsaKF);
 
-        Elemento leones = Nadador("pezleon", c, MOV_CARDUMEN, glm::vec3(-12.0f, 2.5f, 0.0f), 3.0f, 0.2f, "Pez leon (invasor)");
-        leones.miembros = 4; leones.dispersion = 1.5f; leones.sobreSuelo = true; leones.velNado = 4.0f; elementos.push_back(leones);
-        Elemento barracudas = Nadador("barracuda", c, MOV_CARDUMEN, glm::vec3(2.0f, 7.0f, -2.0f), 11.0f, -0.25f, "Barracuda");
-        barracudas.miembros = 5; barracudas.dispersion = 1.5f; elementos.push_back(barracudas);
-        Elemento tiburon = Nadador("Tiburon", c, MOV_ORBITA, glm::vec3(0.0f, 9.0f, 0.0f), 17.0f, 0.12f, "Tiburon");
-        tiburon.ondula = 0.15f; tiburon.velNado = 3.0f; elementos.push_back(tiburon);
-        Elemento vaquita = Nadador("vacamarina", c, MOV_ORBITA, glm::vec3(4.0f, 3.0f, 6.0f), 5.0f, 0.18f, "Vaquita marina");
-        vaquita.ondula = 0.08f; vaquita.velNado = 4.0f; vaquita.sobreSuelo = true; elementos.push_back(vaquita);
+        // 64 barril toxico con su nube verde
+        Elemento barril = fijo("barril", glm::vec3(9.5f, -0.1f, 1.5f), 20, 1.0f, "Barril de residuos toxicos");
+        barril.rotExtra = glm::vec3(8.0f, 0.0f, -12.0f); barril.basura = true; barril.residuo = 3; barril.peso = 5.0f; MatMetalico(barril);
+        elementos.push_back(barril);
+        Elemento nube = fijo("burbuja", glm::vec3(9.5f, 0.9f, 1.5f), 0, 3.2f, nullptr);
+        nube.carpeta = "comun"; nube.tinte = glm::vec3(0.45f, 1.0f, 0.35f); nube.alpha = 0.30f; nube.emision = 0.7f; nube.pulsar = true; nube.fantasma = 0.4f;
+        elementos.push_back(nube);
 
-        fuentes = { glm::vec3(3.0f, 1.8f, -3.0f), glm::vec3(8.0f, 2.5f, -5.5f) };
+        // 63 red de pesca fantasma con una tortuga atrapada
+        Elemento red = fijo("red_fantasma", glm::vec3(-3.5f, -0.2f, -13.0f), 15, 1.0f, "Red fantasma");
+        red.residuo = 4; red.peso = 6.0f; MatOpaco(red); elementos.push_back(red);
+        Elemento tortuga = Fijo("tortuga", "arrecifes", glm::vec3(-3.5f, 1.7f, -13.0f), 15, 1.0f);
+        tortuga.interactivo = true; tortuga.etiqueta = "Tortuga atrapada"; elementos.push_back(tortuga);
+
+        // ---------------- 67/68 cangrejos ermitanos (el de la lata cambia de concha al limpiar)
+        Elemento cLata = fijo("cangrejo_lata", glm::vec3(4.0f, 0.12f, 7.5f), 200, 1.0f, "Cangrejo con lata"); MatMetalico(cLata); cLata.specInt = 0.6f; elementos.push_back(cLata);
+        Elemento cNat = Fijo("cangrejoermitano", "arrecifes", glm::vec3(4.0f, 0.15f, 7.5f), 200, 1.0f); cNat.interactivo = true; cNat.etiqueta = "Cangrejo ermitano"; cNat.visible = false;
+        elementos.push_back(cNat);
+        cNat.pos = glm::vec3(-10.5f, 0.15f, -1.0f); cNat.yaw = 40; cNat.visible = true; elementos.push_back(cNat);
+
+        // ---------------- 71 erizos y 73 estrellas de mar
+        Elemento erizo = fijo("erizo", glm::vec3(0.0f, 0.0f, 0.0f), 0, 1, "Erizo de mar"); MatOpaco(erizo);
+        Esparcir(erizo, 7, glm::vec2(-8.0f, -2.0f), 1.0f, 9.0f, 0.8f, 1.3f, 15);
+        Elemento estrella = fijo("estrella_mar", glm::vec3(0.0f, 0.01f, 0.0f), 0, 1, "Estrella de mar"); MatOpaco(estrella);
+        Esparcir(estrella, 6, glm::vec2(3.0f, 2.0f), 2.0f, 12.0f, 0.8f, 1.4f, 16, { {1.0f,1.0f,1.0f}, {1.0f,0.7f,0.75f}, {0.9f,0.6f,1.0f} });
+
+        // ---------------- 65 peces leon (invasores, se retiran con clic)
+        glm::vec4 leones[] = { {-12.0f, 2.5f, 0.0f, 2.5f}, {-9.0f, 2.0f, -5.0f, 2.0f}, {6.0f, 2.5f, -6.0f, 3.0f}, {-3.0f, 3.0f, 8.0f, 2.5f}, {10.0f, 2.0f, 3.0f, 2.0f}, {-15.0f, 3.0f, 6.0f, 3.0f} };
+        for (int i = 0; i < 6; i++) {
+            Elemento l = Nadador("pezleon", c, MOV_ORBITA, glm::vec3(leones[i]), leones[i].w, (i % 2 ? -0.25f : 0.22f), "Pez leon (invasor)");
+            l.sobreSuelo = true; l.velNado = 4.0f; l.fase = i * 1.1f; l.invasor = true; elementos.push_back(l);
+        }
+        // peces nativos: pocos al inicio, aumentan al retirar invasores y limpiar
+        Elemento roncadores = Nadador("roncador", c, MOV_CARDUMEN, glm::vec3(1.0f, 3.5f, 1.0f), 7.0f, 0.3f, "Roncador");
+        roncadores.miembros = 18; roncadores.dispersion = 1.4f; roncadores.velNado = 12.0f; roncadores.sobreSuelo = true; roncadores.presencia = 0.15f;
+        elementos.push_back(roncadores);
+        Elemento cirujanos = Nadador("Pezcirujano", "arrecifes", MOV_CARDUMEN, glm::vec3(-6.0f, 4.5f, -1.0f), 9.0f, -0.25f, "Pez cirujano azul");
+        cirujanos.miembros = 10; cirujanos.dispersion = 1.2f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true; cirujanos.presencia = 0.15f;
+        elementos.push_back(cirujanos);
+
+        // ---------------- 48 tiburon blanco y 69 medusas
+        Elemento tiburon = Nadador("Tiburon", c, MOV_ORBITA, glm::vec3(0.0f, 9.0f, 0.0f), 20.0f, 0.10f, "Tiburon");
+        tiburon.ondula = 0.15f; tiburon.velNado = 3.0f; elementos.push_back(tiburon);
+        for (int i = 0; i < 6; i++) {
+            Elemento m = fijo("medusa", glm::vec3(-12.0f + i * 5.0f, 5.0f + (i % 3) * 2.5f, -6.0f + (i % 2) * 12.0f), 0, 0.8f + 0.1f * i, "Medusa");
+            m.sobreSuelo = false; m.mov = MOV_DERIVA; m.fase = i * 1.9f; m.pulsar = true; m.alpha = 0.6f; m.emision = 0.35f; m.fantasma = 0.35f;
+            m.mecer = 0.5f; MatTraslucido(m); elementos.push_back(m);
+        }
+
+        // ---------------- 23 burbujas: fugas del submarino
+        fuentes = { glm::vec3(5.0f, 1.6f, -4.5f), glm::vec3(7.5f, 2.3f, -6.0f) };
     }
 
 };

@@ -14,6 +14,7 @@ uniform float uEmision;
 uniform float uResaltado;   // brillo del objeto bajo la mira
 uniform float uBlanqueo;    // 0..1 coral sano -> blanqueado (Zona 1)
 uniform float uFantasma;    // 0..1 animal real -> fantasma (Zona 2)
+uniform float uMuerte;      // 0..1 coral muerto cubierto de algas (Zona 1)
 uniform float uSpecPower;   // potencia especular (opaco bajo, plástico medio, metal alto)
 uniform float uSpecInt;     // intensidad especular
 uniform float uMetalico;    // 0..1: 1 = brillo tintado por la textura
@@ -39,6 +40,15 @@ vec3 colorAgua(vec3 d)
     return mix(c, uNiebla * 1.35 + vec3(0.03), smoothstep(0.05, 0.9, d.y));
 }
 
+float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float ruido3(vec3 p)
+{
+    vec3 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+
 float causticas(vec2 p, float t)
 {
     vec2 q = p * 0.55;
@@ -55,7 +65,15 @@ void main()
     vec4 tex = texture(texture_diffuse1, vUV);
     vec3 base = tex.rgb * uTinte;
     float gris = dot(tex.rgb, vec3(0.333));
-    base = mix(base, vec3(0.95, 0.95, 0.92) * (0.75 + 0.35 * gris), uBlanqueo);
+    // Blanqueamiento por manchas: el coral pierde color en zonas irregulares que crecen
+    if (uBlanqueo > 0.0 || uMuerte > 0.0) {
+        float n = ruido3(vPosMundo * 3.0) * 0.65 + ruido3(vPosMundo * 9.0) * 0.35;
+        float b = smoothstep(n - 0.12, n + 0.12, uBlanqueo * 1.3 - 0.15);
+        base = mix(base, vec3(0.97, 0.96, 0.93) * (0.82 + 0.25 * gris), b);
+        float m = smoothstep(n - 0.15, n + 0.15, uMuerte * 1.3 - 0.15);
+        vec3 algas = mix(vec3(0.40, 0.38, 0.30), vec3(0.28, 0.34, 0.20), ruido3(vPosMundo * 14.0)) * (0.75 + 0.4 * gris);
+        base = mix(base, algas, m);
+    }
 
     vec3 N = normalize(vNormal);
     if (!gl_FrontFacing) N = -N;

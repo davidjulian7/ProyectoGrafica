@@ -108,6 +108,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -123,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -147,6 +149,9 @@
     <ClInclude Include="..\..\include\camera.h" />
     <ClInclude Include="..\..\include\modelstructs.h" />
     <ClInclude Include="..\..\include\zonas.h" />
+    <ClInclude Include="..\..\include\arrecife.h" />
+    <ClInclude Include="..\..\include\fichas.h" />
+    <ClInclude Include="..\..\include\naufragios.h" />
     <ClInclude Include="..\..\include\model.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,0 +1,14 @@
+ACTUALIZACION: ZONA 1 + ZONA 3 + FUSION CON EL TRABAJO DE JULIAN (A1-A4)
+
+Este zip ya contiene los cambios de Julian (camara orbita, materiales Phong,
+keyframes + skinning, modo edicion) combinados con la Zona 1 y la Zona 3.
+
+1. En Git Bash, dentro de ProyectoGrafica:  git pull
+2. Extrae este zip DENTRO de ProyectoGrafica y acepta reemplazar.
+3. Visual Studio: Debug x64, F5.
+
+Zona 1 (Arrecifes): flechas arriba/abajo = temperatura, T = ola de calor, R = restaurar
+Zona 3 (Naufragios): clic = recoger basura / retirar pez leon,
+                     clic sostenido sobre la red = liberar a la tortuga,
+                     F = linterna. El dron senala la basura mas cercana.
+Julian: V = camara orbita, E = modo edicion (Tab, F5 guardar pose)

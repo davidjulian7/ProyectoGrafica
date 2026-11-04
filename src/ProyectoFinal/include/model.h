@@ -41,7 +41,7 @@ public:
     }
 
     // draws the model, and thus all its meshes
-    void Draw(Shader shader)
+    void Draw(Shader &shader)   // por referencia: evita copiar el shader en cada objeto
     {
 		
         for(unsigned int i = 0; i < meshes.size(); i++)

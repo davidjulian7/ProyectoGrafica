@@ -49,8 +49,8 @@ struct AnimacionKF {
             pos = keys[0].pos; yaw = keys[0].yaw; rotExtra = keys[0].rotExtra; escala = keys[0].escala;
             return;
         }
-        if (loop) t = std::fmod(t, dur); if (t < 0.0f) t += dur;
-        else { if (t <= 0.0f) t = 0.0f; if (t >= dur) t = dur; }
+        if (loop) { t = std::fmod(t, dur); if (t < 0.0f) t += dur; }
+        else { if (t <= 0.0f) t = 0.0f; if (t >= dur) t = dur; }   // sin bucle: espera en la 1a pose y se queda en la ultima
 
         // buscar segmento [i, i+1]
         int i = 0;
@@ -145,6 +145,52 @@ inline AnimacionKF KF_BolsaFlota(const glm::vec3& base)
         { 6.0f, base + glm::vec3(-3.0f,  1.5f, -2.5f), 220.0f, glm::vec3(20.0f, 130.0f, -15.0f), 1.0f },
         { 7.5f, base + glm::vec3( 1.5f,  4.0f,  1.0f), 300.0f, glm::vec3(-25.0f, 200.0f, 10.0f), 1.08f },
         { 9.0f, base + glm::vec3( 0.0f,  0.0f,  0.0f), 360.0f, glm::vec3(0.0f), 1.0f },
+    };
+    return a;
+}
+
+
+// ---------------------------------------------------------------- Zona 3 (se reproducen una vez, al ocurrir un evento)
+inline AnimacionKF KF_ColumnaDerrumbe(const glm::vec3& base, float yaw)
+{
+    // se tambalea dos veces y cae sobre su base, con un pequeno rebote (3.4 s)
+    AnimacionKF a; a.loop = false;
+    a.keys = {
+        { 0.0f, base, yaw, glm::vec3(0.0f, 0.0f, 0.0f),  1.0f },
+        { 0.5f, base, yaw, glm::vec3(0.0f, 0.0f, 7.0f),  1.0f },
+        { 0.9f, base, yaw, glm::vec3(0.0f, 0.0f, -2.0f), 1.0f },
+        { 1.3f, base, yaw, glm::vec3(0.0f, 0.0f, 14.0f), 1.0f },
+        { 2.6f, base, yaw, glm::vec3(0.0f, 0.0f, 88.0f), 1.0f },
+        { 2.9f, base, yaw, glm::vec3(0.0f, 0.0f, 80.0f), 1.0f },
+        { 3.4f, base, yaw, glm::vec3(0.0f, 0.0f, 88.0f), 1.0f },
+    };
+    return a;
+}
+
+inline AnimacionKF KF_TapaCofre(const glm::vec3& bisagra, float yaw)
+{
+    // la tapa se entreabre, duda y se abre por completo (2.2 s)
+    AnimacionKF a; a.loop = false;
+    a.keys = {
+        { 0.0f, bisagra, yaw, glm::vec3(0.0f),             1.0f },
+        { 0.4f, bisagra, yaw, glm::vec3(-18.0f, 0.0f, 0.0f), 1.0f },
+        { 0.8f, bisagra, yaw, glm::vec3(-10.0f, 0.0f, 0.0f), 1.0f },
+        { 1.8f, bisagra, yaw, glm::vec3(-115.0f, 0.0f, 0.0f), 1.0f },
+        { 2.2f, bisagra, yaw, glm::vec3(-105.0f, 0.0f, 0.0f), 1.0f },
+    };
+    return a;
+}
+
+inline AnimacionKF KF_TortugaEscapa(const glm::vec3& inicio, float yaw)
+{
+    // sale de la red, gira y sube nadando hacia la luz (7 s)
+    AnimacionKF a; a.loop = false;
+    a.keys = {
+        { 0.0f, inicio,                                   yaw,          glm::vec3(0.0f),               1.0f },
+        { 1.2f, inicio + glm::vec3(0.0f, 0.4f, 1.5f),     yaw - 40.0f,  glm::vec3(0.0f, 0.0f, 10.0f),  1.0f },
+        { 3.0f, inicio + glm::vec3(2.5f, 2.0f, 4.0f),     yaw - 80.0f,  glm::vec3(0.0f, 0.0f, 25.0f),  1.0f },
+        { 5.0f, inicio + glm::vec3(6.0f, 4.5f, 5.0f),     yaw - 120.0f, glm::vec3(0.0f, 0.0f, 15.0f),  1.0f },
+        { 7.0f, inicio + glm::vec3(10.0f, 6.0f, 3.0f),    yaw - 150.0f, glm::vec3(0.0f),               1.0f },
     };
     return a;
 }

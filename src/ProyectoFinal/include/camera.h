@@ -19,7 +19,7 @@ enum Camera_Movement {
 const float YAW         = -90.0f;
 const float PITCH       =  0.0f;
 const float SPEED       =  2.5f;
-const float SENSITIVITY =  0.5f;
+const float SENSITIVITY =  0.12f;   // giro del raton (antes 0.5: demasiado rapido)
 const float ZOOM        =  45.0f;
 
 

@@ -642,7 +642,13 @@ private:
         atunes.miembros = 14; atunes.dispersion = 2.5f; atunes.velNado = 9.0f; atunes.ondula = 0.08f;
         elementos.push_back(atunes);
         Elemento tortuga = Nadador("tortuga", c, MOV_ORBITA, glm::vec3(0.0f, 6.0f, -2.0f), 13.0f, 0.10f, "Tortuga marina");
-        tortuga.ondula = 0.0f; tortuga.oscAmp = 1.0f; tortuga.oscVel = 0.3f; elementos.push_back(tortuga);
+        tortuga.ondula = 0.0f;
+        tortuga.oscAmp = 1.0f;
+        tortuga.oscVel = 0.3f; 
+        // Corrección inicial de orientación
+        tortuga.rotExtra = glm::vec3(-90.0f, 0.0f, -90.0f);
+
+        elementos.push_back(tortuga);
         Elemento manta = Nadador("mantaraya", c, MOV_LIBRE, glm::vec3(0.0f, 10.0f, -6.0f), 22.0f, 0.06f, "Mantarraya");
         manta.ondula = 0.0f; manta.oscAmp = 1.5f; manta.oscVel = 0.25f; elementos.push_back(manta);
         Elemento manati = Nadador("manati", c, MOV_ORBITA, glm::vec3(4.0f, 2.8f, 4.0f), 20.0f, -0.05f, "Manati");

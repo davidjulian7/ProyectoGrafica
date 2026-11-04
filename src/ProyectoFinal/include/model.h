@@ -335,7 +335,24 @@ private:
                 indices.push_back(face.mIndices[j]);
         }
         // process materials
-        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];    
+        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+		if (filename.find("tortuga") != std::string::npos) {
+			std::cout << "[TORTUGA] Texturas difusas: "
+				<< material->GetTextureCount(aiTextureType_DIFFUSE)
+				<< std::endl;
+
+			for (unsigned int i = 0;
+				i < material->GetTextureCount(aiTextureType_DIFFUSE);
+				i++) {
+
+				aiString ruta;
+				material->GetTexture(aiTextureType_DIFFUSE, i, &ruta);
+
+				std::cout << "[TORTUGA] Ruta: "
+					<< ruta.C_Str() << std::endl;
+			}
+		}
+
         // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
         // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER. 
         // Same applies to other texture as the following list summarizes:

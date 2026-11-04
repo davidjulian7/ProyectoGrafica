@@ -158,7 +158,7 @@ private:
     void loadModel(string const &path)
     {
         // read file via ASSIMP
-		scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+		scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);  // GenSmoothNormals: crea normales si el FBX no las trae
         // check for errors
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
         {
@@ -228,9 +228,11 @@ private:
             vector.z = mesh->mVertices[i].z;
             vertex.Position = vector;
             // normals
-            vector.x = mesh->mNormals[i].x;
-            vector.y = mesh->mNormals[i].y;
-            vector.z = mesh->mNormals[i].z;
+            if (mesh->mNormals) {
+                vector.x = mesh->mNormals[i].x;
+                vector.y = mesh->mNormals[i].y;
+                vector.z = mesh->mNormals[i].z;
+            } else vector = glm::vec3(0.0f, 1.0f, 0.0f);
             vertex.Normal = vector;
             // texture coordinates
             if(mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
@@ -245,15 +247,19 @@ private:
             else
                 vertex.TexCoords = glm::vec2(0.0f, 0.0f);
             // tangent
-            vector.x = mesh->mTangents[i].x;
-            vector.y = mesh->mTangents[i].y;
-            vector.z = mesh->mTangents[i].z;
-            vertex.Tangent = vector;
-            // bitangent
-            vector.x = mesh->mBitangents[i].x;
-            vector.y = mesh->mBitangents[i].y;
-            vector.z = mesh->mBitangents[i].z;
-            vertex.Bitangent = vector;
+            if (mesh->mTangents && mesh->mBitangents) {   // solo existen si el modelo tiene UV
+                vector.x = mesh->mTangents[i].x;
+                vector.y = mesh->mTangents[i].y;
+                vector.z = mesh->mTangents[i].z;
+                vertex.Tangent = vector;
+                vector.x = mesh->mBitangents[i].x;
+                vector.y = mesh->mBitangents[i].y;
+                vector.z = mesh->mBitangents[i].z;
+                vertex.Bitangent = vector;
+            } else {
+                vertex.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+                vertex.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
             
 			// Bones
 			int bcount = 0;

@@ -72,9 +72,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>..\..\..\bin\</OutDir>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)..\..\..\bin\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>..\..\..\bin\</OutDir>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)..\..\..\bin\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -137,6 +141,24 @@
   <ItemGroup>
     <ClCompile Include="..\..\ProyectoFinal.cpp" />
     <ClCompile Include="..\..\stb_image.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\menu.h" />
+    <ClInclude Include="..\..\include\camera.h" />
+    <ClInclude Include="..\..\include\modelstructs.h" />
+    <ClInclude Include="..\..\include\zonas.h" />
+    <ClInclude Include="..\..\include\model.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\bin\shaders\menu_fondo.vs" />
+    <None Include="..\..\..\bin\shaders\menu_fondo.fs" />
+    <None Include="..\..\..\bin\shaders\menu_ui.vs" />
+    <None Include="..\..\..\bin\shaders\menu_ui.fs" />
+    <None Include="..\..\..\bin\shaders\zona.vs" />
+    <None Include="..\..\..\bin\shaders\zona.fs" />
+    <None Include="..\..\..\bin\shaders\zona_fondo.fs" />
+    <None Include="..\..\..\bin\shaders\zona_superficie.vs" />
+    <None Include="..\..\..\bin\shaders\zona_superficie.fs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

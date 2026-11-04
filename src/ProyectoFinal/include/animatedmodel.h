@@ -56,18 +56,24 @@ public:
 
 	// update transformations in time 
 	void SetPose(float time, glm::mat4 *gBones) {
-		
-		// processNode(scene->mRootNode, time);
+
+		// Sin animacion valida: huesos en identidad (evita crash al cargar FBX estaticos)
+		if (!scene || scene->mNumAnimations == 0 || currentAnimation >= scene->mNumAnimations) {
+			for (unsigned int i = 0; i < MAX_RIGGING_BONES; i++) gBones[i] = glm::mat4(1.0f);
+			return;
+		}
+
 		glm::mat4 n_matrix(1.0f);
 		ReadNodeHierarchy(time, scene->mRootNode, n_matrix);
 
 		for (unsigned int i = 0; i < bones.size(); i++) {
 			if (i < 100) {
-				
 				gBones[i] = bones[i].transformation;
-				// cout << "bone: " << i << " : " << bones[i].name.data << " T= " << glm::to_string(gBones[i]) << endl;
 			}
 		}
+		// Rellenar el resto con identidad para no dejar basura del frame anterior
+		for (unsigned int i = (unsigned int)bones.size(); i < MAX_RIGGING_BONES; i++)
+			gBones[i] = glm::mat4(1.0f);
 	}
 
 	// update animation
@@ -78,7 +84,7 @@ public:
 			if (animationCount > keys - 1) {
 				animationCount = 0;
 			}
-			// Configuración de la pose en el instante t
+			// Configuraciï¿½n de la pose en el instante t
 			SetPose((float)animationCount, gBones);
 			elapsedTime = 0.0f;
 		}
@@ -89,6 +95,7 @@ private:
 	// Return the duration of the animation in ticks (frames)
 	double getNumFrames() {
 
+		if (!scene || scene->mNumAnimations == 0 || currentAnimation >= scene->mNumAnimations) return -1.0;
 		const aiAnimation* pAnimation = scene->mAnimations[currentAnimation];
 		if (pAnimation == nullptr) return -1.0;
 
@@ -100,6 +107,7 @@ private:
 
 	// return the number of ticks per second
 	double getFramerate() {
+		if (!scene || scene->mNumAnimations == 0 || currentAnimation >= scene->mNumAnimations) return -1.0;
 		const aiAnimation* pAnimation = scene->mAnimations[currentAnimation];
 		if (pAnimation == nullptr) return -1.0;
 
@@ -146,6 +154,8 @@ private:
 
 		fps = (float)getFramerate();
 		keys = (int)getNumFrames();
+		if (fps <= 0.0f) fps = 24.0f;          // evita division por cero en UpdateAnimation
+		if (keys < 1) keys = 1;
 		animationCount = 0;
 		elapsedTime = 0.0f;
 
@@ -230,7 +240,7 @@ private:
             vector.z = mesh->mBitangents[i].z;
             vertex.Bitangent = vector;
             
-			// Bones
+			// Bones: IDs de hueso en indice GLOBAL (m_BoneMapping por nombre)
 			int bcount = 0;
 			for (unsigned int pb = 0; pb < MAX_NUM_BONES; pb++) {
 				vertex.IDs1[pb] = 0.0f;
@@ -242,30 +252,29 @@ private:
 			}
 			m_NumBones = mesh->mNumBones;
 			for (unsigned int j = 0; j < mesh->mNumBones; j++) {
+				// indice global del hueso j de este mesh
+				string bname(mesh->mBones[j]->mName.data);
+				auto bit = m_BoneMapping.find(bname);
+				if (bit == m_BoneMapping.end()) continue;
+				float gId = (float)bit->second;
 
 				for (unsigned int k = 0; k < mesh->mBones[j]->mNumWeights; k++) {
 					unsigned int VertexID = mesh->mBones[j]->mWeights[k].mVertexId;
 					float Weight = (float)(mesh->mBones[j]->mWeights[k].mWeight);
 					if ( VertexID == i && bcount < MAX_NUM_BONES ) {
-						vertex.IDs1[bcount] = (float)j;
+						vertex.IDs1[bcount] = gId;
 						vertex.Weights1[bcount] = Weight;
 						bcount++;
-						/*cout << "Vertex " << VertexID << ": Bone: " << j
-						<< ": W = " << Weight << endl;*/
 					}
 					if (VertexID == i && bcount >= MAX_NUM_BONES && bcount < 2*MAX_NUM_BONES) {
-						vertex.IDs2[bcount - MAX_NUM_BONES] = (float)j;
+						vertex.IDs2[bcount - MAX_NUM_BONES] = gId;
 						vertex.Weights2[bcount - MAX_NUM_BONES] = Weight;
 						bcount++;
-						/*cout << "Vertex " << VertexID << ": Bone: " << j
-							<< ": W = " << Weight << endl;*/
 					}
 					if (VertexID == i && bcount >= 2 * MAX_NUM_BONES && bcount < 3 * MAX_NUM_BONES) {
-						vertex.IDs3[bcount - 2*MAX_NUM_BONES] = (float)j;
+						vertex.IDs3[bcount - 2*MAX_NUM_BONES] = gId;
 						vertex.Weights3[bcount - 2*MAX_NUM_BONES] = Weight;
 						bcount++;
-						/*cout << "Vertex " << VertexID << ": Bone: " << j
-							<< ": W = " << Weight << endl;*/
 					}
 				}
 			}
@@ -275,10 +284,11 @@ private:
         }
 		// cout << "Vertex readed: " << vertices.size() << endl;
 
-		// Process Bones
-		// cout << "Num bones readed: " << mesh->mNumBones << endl;
-		bones.clear();
+		// Process Bones: acumula en lista global con mapping nombre->indice
+		// (no clear: multi-malla compartia el esqueleto; los IDs de vertices usan el indice global)
 		for (unsigned int i = 0; i < mesh->mNumBones; i++) {
+			string bname(mesh->mBones[i]->mName.data);
+			if (m_BoneMapping.count(bname)) continue;
 
 			Bone  newBone;
 			newBone.name = mesh->mBones[i]->mName;
@@ -291,6 +301,7 @@ private:
 				newBone.push( VertexID, Weight );
 			}
 
+			m_BoneMapping[bname] = (unsigned int)bones.size();
 			bones.push_back(newBone);
 		}
 		// cout << "NumFaces: " << mesh->mNumFaces << endl;

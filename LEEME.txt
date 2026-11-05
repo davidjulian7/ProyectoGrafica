@@ -1,0 +1,13 @@
+ACUARIO VIRTUAL INTERACTIVO - como compilar
+1. Git Bash, dentro de ProyectoGrafica:  git pull
+2. Abrir src/ProyectoFinal/Proyecto/ProyectoFinal/ProyectoFinal.sln
+3. Elegir Release y x64, Ctrl+Shift+B y F5
+
+Controles en las zonas: WASD nadar, Espacio/Ctrl subir/bajar, Shift aletear, F linterna,
+L lista de especies, clic interactuar, V camara orbita, E modo edicion, Esc menu.
+Zona 1: flechas arriba/abajo temperatura, T ola de calor, R restaurar.
+Zona 3: clic recoger basura / retirar pez leon, clic sostenido sobre la red = liberar tortuga.
+
+Los modelos originales de Meshy (pulpo y submarino) no se suben: el juego usa las versiones
+optimizadas en src/bin/models/zonas. Para reexportarlos, copia los .glb a ModelosProyecto con los
+nombres pulpo_meshy.glb y submarino_meshy.glb y ejecuta herramientas/exporta_modelos_equipo.py.

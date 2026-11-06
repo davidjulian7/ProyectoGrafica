@@ -286,6 +286,7 @@ public:
     //  - asistencia de punteria: si el centro no toca nada, se toma el objeto mas cercano al centro
     void Picking(const glm::mat4& proj, const glm::mat4& view, float t, int fbW, int fbH)
     {
+        if (InspeccionActiva()) return;
         glm::mat4 inv = glm::inverse(view);
         glm::vec3 o = glm::vec3(inv[3]), d = -glm::normalize(glm::vec3(inv[2]));
         int R = (int)(16.0f * fbH / 768.0f); if (R < 5) R = 5;
@@ -307,7 +308,7 @@ public:
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
             if (!e.visible || e.alpha < 0.35f && !e.interactivo) continue;
-            unsigned int id = e.interactivo ? e.id : 0xFFFFFF;
+            unsigned int id = (zona == 1 || e.interactivo) ? e.id : 0xFFFFFF;
             bool colorPuesto = false;
             for (int k = 0; k < Visibles(e); k++) {
                 glm::mat4 M = Matriz(e, (int)i, k, t);
@@ -360,6 +361,23 @@ public:
     }
 
     const Elemento* Seleccionado() const { return seleccion >= 0 ? &elementos[seleccion] : nullptr; }
+
+    bool InspeccionActiva() const { return inspeccionIdx >= 0 && inspeccionIdx < (int)elementos.size(); }
+    const Elemento* ElementoInspeccionado() const { return InspeccionActiva() ? &elementos[inspeccionIdx] : nullptr; }
+    void AbrirInspeccion()
+    {
+        if (zona != 1 || seleccion < 0 || seleccion >= (int)elementos.size() || !elementos[seleccion].visible) return;
+        inspeccionIdx = seleccion;
+        giroInspeccion = inclinacionInspeccion = 0.0f;
+        zoomInspeccion = 1.0f;
+    }
+    void CerrarInspeccion() { inspeccionIdx = -1; }
+    void RotarInspeccion(float dx, float dy)
+    {
+        giroInspeccion += dx * 0.45f;
+        inclinacionInspeccion = glm::clamp(inclinacionInspeccion + dy * 0.45f, -75.0f, 75.0f);
+    }
+    void ZoomInspeccion(float delta) { zoomInspeccion = glm::clamp(zoomInspeccion + delta * 0.12f, 0.65f, 1.7f); }
 
     // ------------------------------------------------------------ modo edición (A3)
     bool modoEdicion = false;
@@ -471,6 +489,7 @@ public:
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
             if (!e.visible || e.alpha < 1.0f) continue;
+            if (InspeccionActiva() && (int)i == inspeccionIdx) continue;
             DibujarElemento(e, (int)i, t);
         }
 
@@ -512,6 +531,7 @@ public:
         glDepthMask(GL_FALSE);
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
+            if (InspeccionActiva() && (int)i == inspeccionIdx) continue;
             if (e.visible && e.alpha < 1.0f) DibujarElemento(e, (int)i, t);
         }
         Comunes(glm::vec3(0.85f, 0.95f, 1.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.45f, 0.35f);
@@ -529,6 +549,36 @@ public:
         glDisable(GL_BLEND);
     }
 
+    // Presenta el modelo seleccionado delante de la camara sin alterar su pose en la escena.
+    void DibujarInspeccion(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t)
+    {
+        if (!InspeccionActiva()) return;
+        Elemento& e = elementos[inspeccionIdx];
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_BLEND);
+        sh->use();
+        ConfigurarShader(proj, view, cam, t, &cam);
+        Comunes(e.tinte, e.ondula, e.medioLargo, e.mecer, e.fase, e.alpha, e.emision);
+        sh->setFloat("uSpecPower", e.specPower);
+        sh->setFloat("uSpecInt", e.specInt);
+        sh->setFloat("uMetalico", e.metalico);
+        sh->setFloat("uBlanqueo", e.blanqueo);
+        sh->setFloat("uMuerte", e.muerte);
+        sh->setInt("uOndulaEje", e.ondulaVertical ? 1 : 0);
+        sh->setFloat("uFantasma", e.fantasma);
+        glm::mat4 pose = Matriz(e, inspeccionIdx, 0, t);
+        glm::mat4 rotacion(1.0f);
+        rotacion = glm::rotate(rotacion, glm::radians(giroInspeccion), cam.Up);
+        rotacion = glm::rotate(rotacion, glm::radians(inclinacionInspeccion), cam.Right);
+        float diametro = 2.0f * e.radioBase * e.escala;
+        float ajuste = 2.2f / (diametro > 0.05f ? diametro : 0.05f);
+        glm::vec3 centro = cam.Position + cam.Front * 3.8f + cam.Up * 0.05f;
+        glm::mat4 modelo = glm::translate(glm::mat4(1.0f), centro) * rotacion
+                         * glm::mat4(glm::mat3(pose)) * glm::scale(glm::mat4(1.0f), glm::vec3(ajuste * zoomInspeccion));
+        sh->setMat4("model", modelo);
+        e.modelo->Draw(*sh, e.modelo->TieneAnimacion() ? t : -1.0f);
+    }
+
 private:
     Shader* sh = nullptr, * shFondo = nullptr, * shSuperficie = nullptr, * shPicking = nullptr;
     GLuint vaoVacio = 0, vaoQuad = 0, vboQuad = 0, cubo = 0;
@@ -543,6 +593,8 @@ private:
     Model* terreno = nullptr;
     Model* burbujaModelo = nullptr;
     std::vector<float> alturas;
+    int inspeccionIdx = -1;
+    float giroInspeccion = 0.0f, inclinacionInspeccion = 0.0f, zoomInspeccion = 1.0f;
     static const int N = 111;
     float respiracion = 3.0f, fuenteTiempo = 0.0f;
 public:
@@ -699,6 +751,7 @@ private:
         sh->setFloat("uMuerte", 0.0f);
         sh->setFloat("uFantasma", 0.0f);
         sh->setInt("uOndulaEje", 0);
+        sh->setInt("uSkinning", 0);
         sh->setFloat("uSpecPower", 40.0f);
         sh->setFloat("uSpecInt", 0.25f);
         sh->setFloat("uMetalico", 0.0f);
@@ -734,7 +787,7 @@ private:
             if (!EnVista(glm::vec3(M[3]), e.radioBase * EscalaMax(M) * 1.15f)) continue;
             sh->setFloat("uFase", e.fase + k * 1.3f);
             sh->setMat4("model", M);
-            e.modelo->Draw(*sh);
+            e.modelo->Draw(*sh, e.modelo->TieneAnimacion() ? t + e.fase + k * 0.37f : -1.0f);
         }
     }
 
@@ -829,6 +882,12 @@ private:
         payasos.miembros = 6; payasos.dispersion = 0.5f; payasos.velNado = 12.0f; payasos.sobreSuelo = true; payasos.oscAmp = 0.2f;
         elementos.push_back(payasos);
 
+        // Pez loro recorre el claro central con seis cuadros clave.
+        Elemento pezLoro = Nadador("PezLoro", c, MOV_KF, glm::vec3(0.0f, 4.2f, 0.0f), 0.0f, 0.0f, "Pez loro");
+        pezLoro.kf = GuardarKF(KF_PezLoro(pezLoro.pos));
+        pezLoro.ondula = 0.05f; pezLoro.velNado = 4.0f; pezLoro.fase = 1.5f;
+        elementos.push_back(pezLoro);
+
         // 17 Pradera de pasto marino con 08 manati y 03 caballitos de mar
         Elemento pasto = Fijo("pasto_marino", c, glm::vec3(0.0f, -0.05f, 0.0f), 0, 1);
         pasto.mecer = 1.6f; pasto.interactivo = true; pasto.etiqueta = "Pasto marino";
@@ -873,9 +932,13 @@ private:
         globo.inflable = true; globo.sobreSuelo = true; globo.ondula = 0.03f; globo.oscAmp = 0.3f; elementos.push_back(globo);
         globo.pos = glm::vec3(12.0f, 2.2f, 4.0f); globo.vel = -0.2f; globo.fase = 2.0f; elementos.push_back(globo);
         globo.pos = glm::vec3(1.0f, 2.5f, -1.0f); globo.radio = 4.0f; globo.vel = 0.15f; globo.fase = 4.0f; elementos.push_back(globo);
-        Elemento tortuga = Nadador("tortuga", c, MOV_ORBITA, glm::vec3(0.0f, 4.5f, 0.0f), 11.0f, 0.09f, "Tortuga marina");
-        tortuga.ondula = 0.0f; tortuga.oscAmp = 1.0f; tortuga.oscVel = 0.3f; elementos.push_back(tortuga);
-        tortuga.pos = glm::vec3(-12.0f, 3.5f, 6.0f); tortuga.radio = 7.0f; tortuga.vel = -0.11f; tortuga.fase = 2.5f; tortuga.escala = 0.85f; elementos.push_back(tortuga);
+        Elemento tortuga = Nadador("tortuga", c, MOV_KF, glm::vec3(0.0f, 4.5f, 0.0f), 10.5f, 0.09f, "Tortuga marina");
+        tortuga.ondula = 0.0f; tortuga.oscAmp = 0.0f; tortuga.oscVel = 1.0f;
+        tortuga.kf = GuardarKF(KF_TortugaArrecife(tortuga.pos, 10.5f, 1.0f));
+        elementos.push_back(tortuga);
+        tortuga.pos = glm::vec3(-12.0f, 3.5f, 6.0f); tortuga.fase = 2.5f; tortuga.escala = 0.85f;
+        tortuga.kf = GuardarKF(KF_TortugaArrecife(tortuga.pos, 6.0f, 0.85f));
+        elementos.push_back(tortuga);
         Elemento manta = Nadador("mantaraya", c, MOV_LIBRE, glm::vec3(0.0f, 8.0f, -6.0f), 22.0f, 0.06f, "Mantarraya");
         manta.ondula = 0.0f; manta.oscAmp = 1.5f; manta.oscVel = 0.25f; elementos.push_back(manta);
         Elemento delfines = Nadador("delfin", c, MOV_CARDUMEN, glm::vec3(0.0f, 10.5f, 0.0f), 24.0f, 0.22f, "Delfin nariz de botella");

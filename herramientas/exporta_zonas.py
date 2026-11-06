@@ -22,6 +22,7 @@ TEX = 1024
 # nombre: (zona, rotacion en Z para que la cabeza mire a +X, tamano mayor en metros)
 MODELOS = {
     'PezPayaso': ('arrecifes', 180, 0.45), 'Pezcirujano': ('arrecifes', 180, 0.5),
+    'PezLoro': ('arrecifes', 180, 0.7),
     'CaballitoMar': ('arrecifes', 180, 0.5), 'tortuga': ('arrecifes', -90, 1.4),
     'mantaraya': ('arrecifes', 90, 3.5), 'cangrejoermitano': ('arrecifes', 90, 0.35),
     'almejagigante': ('arrecifes', 0, 1.0), 'manati': ('arrecifes', 90, 3.2),
@@ -39,6 +40,7 @@ MODELOS = {
 }
 # Modelos sin textura utilizable: se les da una proyeccion lateral y una textura pintada
 PINTADOS = {
+    'PezLoro': ((25, 105, 115), (244, 198, 78), (32, 165, 145)),
     'Pezcirujano': ((40, 80, 200), (25, 50, 150), (250, 205, 40)),
     'barracuda': ((70, 85, 100), (215, 222, 228), None),
     'Tiburon': ((85, 100, 115), (230, 232, 235), None),

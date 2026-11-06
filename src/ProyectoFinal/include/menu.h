@@ -355,6 +355,37 @@ public:
         glPolygonMode(GL_FRONT_AND_BACK, modoPoligono[0]);
     }
 
+    void DrawInspeccion(GLFWwindow* ventana, const std::string& etiqueta, const std::string& modelo,
+                        const std::string& detalle = std::string(), glm::vec3 colorDetalle = glm::vec3(1.0f))
+    {
+        Layout(ventana);
+        Comenzar(ventana);
+        float s = escala, w = menuMin(390.0f * s, fbW * 0.40f), pad = 18.0f * s;
+        const Ficha* ficha = BuscarFicha(etiqueta);
+        std::string titulo = ficha ? ficha->nombre : etiqueta;
+        std::vector<std::string> dato = ficha ? Lineas(ficha->dato, w - 2.0f * pad, 15.0f * s, false)
+                                             : Lineas("Modelo del arrecife seleccionado para observar sus formas y materiales.", w - 2.0f * pad, 15.0f * s, false);
+        std::vector<std::string> extra = detalle.empty() ? std::vector<std::string>() : Lineas(detalle, w - 2.0f * pad, 13.0f * s, false);
+        float h = pad * 2.0f + 18.0f * s + 34.0f * s + 22.0f * s + dato.size() * 19.0f * s
+                + extra.size() * 17.0f * s + 58.0f * s;
+        float x = 22.0f * s, y = (fbH - h) * 0.5f;
+        DibujarColor(glm::vec4(0.0f, 0.0f, fbW, fbH), glm::vec4(0.0f, 0.025f, 0.05f, 0.58f), 0.0f, 1.0f);
+        DibujarColor(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.94f), 14.0f * s, 1.0f);
+        DibujarColor(glm::vec4(x, y, 4.0f * s, h), glm::vec4(0.35f, 0.86f, 0.84f, 1.0f), 2.0f * s, 1.0f);
+        float ty = y + pad;
+        Texto("INSPECCION · SIMULACION EN PAUSA", x + pad, ty, 12.0f * s, glm::vec4(0.45f, 0.9f, 0.88f, 1.0f)); ty += 23.0f * s;
+        Texto(titulo, x + pad, ty, 24.0f * s, glm::vec4(1.0f), 0, true); ty += 32.0f * s;
+        Texto(ficha ? ficha->categoria : "MODELO 3D", x + pad, ty, 13.0f * s, glm::vec4(0.65f, 0.82f, 0.88f, 1.0f)); ty += 20.0f * s;
+        if (ficha) { Texto(ficha->estado, x + pad, ty, 14.0f * s, glm::vec4(0.9f, 0.78f, 0.48f, 1.0f), 0, false); ty += 22.0f * s; }
+        for (const std::string& linea : dato) { Texto(linea, x + pad, ty, 15.0f * s, glm::vec4(0.94f, 0.96f, 0.98f, 1.0f), 0, false); ty += 19.0f * s; }
+        for (const std::string& linea : extra) { Texto(linea, x + pad, ty + 4.0f * s, 13.0f * s, glm::vec4(colorDetalle, 1.0f), 0, false); ty += 17.0f * s; }
+        Texto("MODELO: " + modelo + ".fbx", x + pad, y + h - 34.0f * s, 12.0f * s, glm::vec4(0.68f, 0.78f, 0.82f, 1.0f), 0, false);
+        float cx = fbW * 0.70f;
+        Texto("Mueve el raton para rotar", cx, fbH - 78.0f * s, 15.0f * s, glm::vec4(1.0f), 1);
+        Texto("Rueda: acercar / alejar   ·   Clic o Esc: cerrar", cx, fbH - 52.0f * s, 13.0f * s, glm::vec4(0.8f, 0.9f, 0.94f, 1.0f), 1, false);
+        Terminar();
+    }
+
     // ------------------------------------------------------------------
     // API de interfaz para el HUD de las zonas (texto, paneles, barras)
     // Uso: Comenzar(ventana); ...Texto/Rect...; Terminar();

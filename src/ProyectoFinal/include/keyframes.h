@@ -195,4 +195,35 @@ inline AnimacionKF KF_TortugaEscapa(const glm::vec3& inicio, float yaw)
     return a;
 }
 
+// Tortuga recorre el arrecife en circulo, con cabeceo suave (ciclo de 12 s).
+inline AnimacionKF KF_TortugaArrecife(const glm::vec3& base, float radio = 10.0f, float escala = 1.0f)
+{
+    AnimacionKF a;
+    const int n = 8;
+    for (int i = 0; i <= n; i++) {
+        float ang = (float)i / (float)n * 6.2831853f;
+        float yaw = -90.0f - (float)i * (360.0f / (float)n);
+        glm::vec3 p = base + glm::vec3(cosf(ang) * radio,
+                                       0.35f + 0.35f * sinf(ang * 2.0f),
+                                       sinf(ang) * radio);
+        a.keys.push_back({ (float)i * 1.5f, p, yaw, glm::vec3(0.0f), escala });
+    }
+    return a;
+}
+
+// Pez loro recorre un arco amplio sobre el arrecife (ciclo de 12 s).
+inline AnimacionKF KF_PezLoro(const glm::vec3& base)
+{
+    AnimacionKF a;
+    a.keys = {
+        { 0.0f,  base + glm::vec3(-8.0f, 0.0f,  2.0f),   0.0f, glm::vec3(0.0f), 1.0f },
+        { 2.4f,  base + glm::vec3(-5.0f, 0.8f,  6.0f),  50.0f, glm::vec3(0.0f, 0.0f,  3.0f), 1.0f },
+        { 4.8f,  base + glm::vec3( 0.0f, 0.2f,  7.0f),  95.0f, glm::vec3(0.0f), 1.0f },
+        { 7.2f,  base + glm::vec3( 5.0f, 0.9f,  3.0f), 145.0f, glm::vec3(0.0f, 0.0f, -3.0f), 1.0f },
+        { 9.6f,  base + glm::vec3( 2.0f, 0.3f, -3.0f), 225.0f, glm::vec3(0.0f), 1.0f },
+        { 12.0f, base + glm::vec3(-8.0f, 0.0f,  2.0f), 360.0f, glm::vec3(0.0f), 1.0f },
+    };
+    return a;
+}
+
 #endif // KEYFRAMES_H

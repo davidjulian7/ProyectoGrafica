@@ -167,6 +167,7 @@ int pickedFish = -1; // índice del pez seleccionado, -1 = ninguno
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 ISound* sonidoAmbiente = nullptr;   // ambiente en bucle de la zona actual
 bool silencio = false;
+bool ambienteInspeccionPausado = false;
 
 // Cambia el sonido ambiente (nullptr = detener)
 void Ambiente(const char* archivo, float volumen)
@@ -328,15 +329,21 @@ bool Update() {
 	float currentFrame = (float)glfwGetTime();
 	deltaTime = currentFrame - lastFrame;
 	lastFrame = currentFrame;
-	animTime += deltaTime;
-	zonaTiempo += deltaTime;
+	bool inspeccion = estadoActual == ARRECIFES && escenario.InspeccionActiva();
+	if (sonidoAmbiente && ambienteInspeccionPausado != inspeccion) {
+		sonidoAmbiente->setIsPaused(inspeccion);
+		ambienteInspeccionPausado = inspeccion;
+	}
+	float dtEscena = inspeccion ? 0.0f : deltaTime;
+	animTime += dtEscena;
+	zonaTiempo += dtEscena;
 
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
-	processInput(window);
-	if (escenario.Actualizar(deltaTime, animTime, camera))
+	if (!inspeccion) processInput(window);
+	if (escenario.Actualizar(dtEscena, animTime, camera))
 		Efecto("sound/burbujas.wav", 0.35f);          // exhalación del buzo
 	if (estadoActual == ARRECIFES) {
-		arrecife.Actualizar(deltaTime, window, escenario, escenario.Seleccionado());
+		arrecife.Actualizar(dtEscena, window, escenario, escenario.Seleccionado());
 		if (arrecife.sonarAlerta) { Efecto("sound/alerta.wav", 0.6f); arrecife.sonarAlerta = false; }
 		if (arrecife.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); arrecife.sonarDescubrir = false; }
 	}
@@ -360,7 +367,7 @@ bool Update() {
 
 	// Cámara activa: FP del buzo u órbita que lo persigue por detrás
 	const Camera* camVista = &camera;
-	if (modoOrbita) {
+	if (modoOrbita && !inspeccion) {
 		glm::vec3 objetivo = camera.Position + camera.Front * 2.0f;
 		glm::vec3 pos = objetivo - camera.Front * orbitDist + glm::vec3(0.0f, 1.2f, 0.0f);
 		float suelo = escenario.AlturaSuelo(pos.x, pos.z) + 0.5f;
@@ -387,6 +394,7 @@ bool Update() {
 	// 2) Escena de la zona: agua, terreno, fauna, superficie y burbujas
 	//    camVista gobierna la vista; la linterna sigue atada al buzo (camera FP)
 	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera);
+	if (inspeccion) escenario.DibujarInspeccion(projection, view, camera, animTime);
 
 	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
 	const Elemento* sel = escenario.Seleccionado();
@@ -395,11 +403,15 @@ bool Update() {
 		: estadoActual == ARRECIFES ? arrecife.Detalle(*sel, colorDetalle)
 		: estadoActual == AGUAS_FRIAS ? aguasFrias.Detalle(*sel, colorDetalle)
 		: estadoActual == NAUFRAGIOS ? naufragio.Detalle(*sel, colorDetalle) : std::string();
-	menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
+	if (!inspeccion) menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
 	if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 	if (estadoActual == AGUAS_FRIAS) aguasFrias.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 	if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
+	if (inspeccion) {
+		const Elemento* observado = escenario.ElementoInspeccionado();
+		if (observado) menuInicio.DrawInspeccion(window, observado->etiqueta, observado->archivo, detalle, colorDetalle);
+	}
 	zonaFade = zonaFade - deltaTime * 1.4f;
 	if (zonaFade < 0.0f) zonaFade = 0.0f;
 
@@ -500,6 +512,12 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 			menuInicio.OnClick();
 		return;
 	}
+	if (estadoActual == ARRECIFES && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !escenario.modoEdicion) {
+		if (escenario.InspeccionActiva()) escenario.CerrarInspeccion();
+		else escenario.AbrirInspeccion();
+		firstMouse = true;
+		return;
+	}
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		if (estadoActual == NAUFRAGIOS && !escenario.modoEdicion)
 			naufragio.Clic(escenario.seleccion, escenario, animTime);   // recoger, retirar invasor, cofre
@@ -537,6 +555,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		firstMouse = true;
 		return;
 	}
+	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
+		if (firstMouse) {
+			lastX = (float)xpos; lastY = (float)ypos; firstMouse = false;
+			return;
+		}
+		float dx = (float)xpos - lastX, dy = lastY - (float)ypos;
+		lastX = (float)xpos; lastY = (float)ypos;
+		escenario.RotarInspeccion(dx, dy);
+		return;
+	}
 
 	if (firstMouse)
 	{
@@ -557,6 +585,10 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	if (estadoActual == MENU) return;
+	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
+		escenario.ZoomInspeccion((float)yoffset);
+		return;
+	}
 	if (modoOrbita) {
 		orbitDist -= (float)yoffset * 0.5f;
 		if (orbitDist < 3.0f) orbitDist = 3.0f;
@@ -584,6 +616,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			glfwSetWindowShouldClose(window, true);
 		else
 			menuInicio.OnKey(key);
+		return;
+	}
+	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
+		if (key == GLFW_KEY_ESCAPE) escenario.CerrarInspeccion();
 		return;
 	}
 
@@ -651,6 +687,8 @@ bool UpdateMenu()
 void EntrarZona(int zona)
 {
 	estadoActual = (Estado)zona;
+	escenario.CerrarInspeccion();
+	ambienteInspeccionPausado = false;
 
 	// Carga la zona (la primera vez lee sus modelos) y coloca al buzo en su punto de inicio
 	escenario.Entrar(zona, camera);

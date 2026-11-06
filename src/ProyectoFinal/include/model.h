@@ -19,9 +19,16 @@ public:
 	/* Bones data */
 	vector<Bone> bones;
 
+	static const int MAX_BONES_MODEL = 50;
+	glm::mat4 m_Bones[MAX_BONES_MODEL];
+	unsigned int m_BoneShaderID = 0;
+	GLint m_BoneLocations[MAX_BONES_MODEL];
+	double m_AnimDuracion = 0.0;
+	double m_AnimFps = 24.0;
+
 	/* Scene data */
 	Assimp::Importer importer;
-	const aiScene* scene;
+	const aiScene* scene = nullptr;
 	
 	map<string, unsigned int> m_BoneMapping; // maps a bone name to its index
 	unsigned int m_NumBones;
@@ -37,13 +44,33 @@ public:
     Model(string const &path, unsigned int id = 0, bool gamma = false) : gammaCorrection(gamma)
     {
 		IDforPicking = id;
+		for (int i = 0; i < MAX_BONES_MODEL; i++) {
+			m_Bones[i] = glm::mat4(1.0f);
+			m_BoneLocations[i] = -1;
+		}
         loadModel(path);
     }
 
+	bool TieneAnimacion() const { return scene && scene->mNumAnimations > 0; }
+
+	void ActualizarPose(float segundos)
+	{
+		if (!TieneAnimacion()) return;
+		double total = m_AnimDuracion > 0.0 ? m_AnimDuracion : 1.0;
+		double t = std::fmod((double)segundos * m_AnimFps, total);
+		if (t < 0.0) t += total;
+		SetPose((float)t);
+	}
+
     // draws the model, and thus all its meshes
-    void Draw(Shader &shader)   // por referencia: evita copiar el shader en cada objeto
+    void Draw(Shader &shader, float animSegundos = -1.0f)   // por referencia: evita copiar el shader en cada objeto
     {
-		
+		bool animar = animSegundos >= 0.0f && TieneAnimacion();
+		shader.setInt("uSkinning", animar ? 1 : 0);
+		if (animar) {
+			ActualizarPose(animSegundos);
+			SubirHuesos(shader);
+		}
         for(unsigned int i = 0; i < meshes.size(); i++)
             meshes[i].Draw(shader);
     }
@@ -101,41 +128,50 @@ public:
 	}
 
 	// update transformations in time 
+	void SetPose(float time) { SetPose(time, m_Bones); }
+
 	void SetPose(float time, glm::mat4 *gBones) {
-		
+		if (!TieneAnimacion()) {
+			for (int i = 0; i < MAX_BONES_MODEL; i++) gBones[i] = glm::mat4(1.0f);
+			return;
+		}
+
 		// processNode(scene->mRootNode, time);
 		glm::mat4 n_matrix(1.0f);
 		ReadNodeHierarchy(time, scene->mRootNode, n_matrix);
 
-		for (unsigned int i = 0; i < bones.size(); i++) {
-			if (i < 100) {
-				
-				gBones[i] = bones[i].transformation;
-				// cout << "bone: " << i << " : " << bones[i].name.data << " T= " << glm::to_string(gBones[i]) << endl;
+		for (unsigned int i = 0; i < bones.size() && i < MAX_BONES_MODEL; i++)
+			gBones[i] = bones[i].transformation;
+		for (unsigned int i = (unsigned int)bones.size(); i < MAX_BONES_MODEL; i++)
+			gBones[i] = glm::mat4(1.0f);
+	}
+
+	void SubirHuesos(Shader &shader) {
+		if (m_BoneShaderID != shader.ID) {
+			m_BoneShaderID = shader.ID;
+			for (int i = 0; i < MAX_BONES_MODEL; i++) {
+				string nombre = "gBones[" + std::to_string(i) + "]";
+				m_BoneLocations[i] = glGetUniformLocation(shader.ID, nombre.c_str());
 			}
 		}
+		if (m_BoneLocations[0] != -1)
+			glUniformMatrix4fv(m_BoneLocations[0], MAX_BONES_MODEL, GL_FALSE, &m_Bones[0][0][0]);
 	}
 
 	// Return the duration of the animation in ticks (frames)
 	double getNumFrames() {
-
+		if (!TieneAnimacion()) return -1.0;
 		const aiAnimation* pAnimation = scene->mAnimations[0];
 		if (pAnimation == nullptr) return -1.0;
-
-		cout << "Animation total frames:" << pAnimation->mDuration << endl;
-
 		return pAnimation->mDuration;
-
 	}
 
 	// return the number of ticks per second
 	double getFramerate() {
+		if (!TieneAnimacion()) return -1.0;
 		const aiAnimation* pAnimation = scene->mAnimations[0];
 		if (pAnimation == nullptr) return -1.0;
-
-		cout << "Animation framerate:" << pAnimation->mTicksPerSecond << " fps" << endl;
-
-		return  pAnimation->mTicksPerSecond;
+		return pAnimation->mTicksPerSecond;
 	}
 
 private:
@@ -172,6 +208,18 @@ private:
 		aiMatrix4x4 inverseTransform = scene->mRootNode->mTransformation;
 		inverseTransform.Inverse();
 		m_GlobalInverseTransform = aiMatrix4x4ToGlm(inverseTransform);
+
+		m_BoneMapping.clear();
+		bones.clear();
+		m_AnimDuracion = 0.0;
+		m_AnimFps = 24.0;
+		if (scene->mNumAnimations > 0) {
+			const aiAnimation* anim = scene->mAnimations[0];
+			if (anim) {
+				m_AnimDuracion = anim->mDuration;
+				if (anim->mTicksPerSecond > 0.0) m_AnimFps = anim->mTicksPerSecond;
+			}
+		}
 
         // process ASSIMP's root node recursively
         processNode(scene->mRootNode, scene);
@@ -216,6 +264,22 @@ private:
         vector<Texture> textures;
 
 		// cout << "NumVertices: " << mesh->mNumVertices << endl;
+
+		// Bones: registrar el esqueleto antes de los vertices para usar indices globales.
+		for (unsigned int i = 0; i < mesh->mNumBones; i++) {
+			string bname(mesh->mBones[i]->mName.data);
+			if (m_BoneMapping.count(bname)) continue;
+
+			Bone newBone;
+			newBone.name = mesh->mBones[i]->mName;
+			newBone.offsetMatrix = aiMatrix4x4ToGlm(mesh->mBones[i]->mOffsetMatrix);
+			newBone.transformation = glm::mat4(1.0f);
+			for (unsigned int j = 0; j < mesh->mBones[i]->mNumWeights; j++)
+				newBone.push(mesh->mBones[i]->mWeights[j].mVertexId, mesh->mBones[i]->mWeights[j].mWeight);
+
+			m_BoneMapping[bname] = (unsigned int)bones.size();
+			bones.push_back(newBone);
+		}
 
         // Walk through each of the mesh's vertices
         for(unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -273,30 +337,28 @@ private:
 			}
 			m_NumBones = mesh->mNumBones;
 			for (unsigned int j = 0; j < mesh->mNumBones; j++) {
+				string bname(mesh->mBones[j]->mName.data);
+				auto bit = m_BoneMapping.find(bname);
+				if (bit == m_BoneMapping.end()) continue;
+				float gId = (float)bit->second;
 
 				for (unsigned int k = 0; k < mesh->mBones[j]->mNumWeights; k++) {
 					unsigned int VertexID = mesh->mBones[j]->mWeights[k].mVertexId;
 					float Weight = (float)(mesh->mBones[j]->mWeights[k].mWeight);
 					if ( VertexID == i && bcount < MAX_NUM_BONES ) {
-						vertex.IDs1[bcount] = (float)j;
+						vertex.IDs1[bcount] = gId;
 						vertex.Weights1[bcount] = Weight;
 						bcount++;
-						/*cout << "Vertex " << VertexID << ": Bone: " << j
-						<< ": W = " << Weight << endl;*/
 					}
 					if (VertexID == i && bcount >= MAX_NUM_BONES && bcount < 2*MAX_NUM_BONES) {
-						vertex.IDs2[bcount - MAX_NUM_BONES] = (float)j;
+						vertex.IDs2[bcount - MAX_NUM_BONES] = gId;
 						vertex.Weights2[bcount - MAX_NUM_BONES] = Weight;
 						bcount++;
-						/*cout << "Vertex " << VertexID << ": Bone: " << j
-							<< ": W = " << Weight << endl;*/
 					}
 					if (VertexID == i && bcount >= 2 * MAX_NUM_BONES && bcount < 3 * MAX_NUM_BONES) {
-						vertex.IDs3[bcount - 2*MAX_NUM_BONES] = (float)j;
+						vertex.IDs3[bcount - 2*MAX_NUM_BONES] = gId;
 						vertex.Weights3[bcount - 2*MAX_NUM_BONES] = Weight;
 						bcount++;
-						/*cout << "Vertex " << VertexID << ": Bone: " << j
-							<< ": W = " << Weight << endl;*/
 					}
 				}
 			}
@@ -306,24 +368,6 @@ private:
         }
 		// cout << "Vertex readed: " << vertices.size() << endl;
 
-		// Process Bones
-		// cout << "Num bones readed: " << mesh->mNumBones << endl;
-		bones.clear();
-		for (unsigned int i = 0; i < mesh->mNumBones; i++) {
-
-			Bone  newBone;
-			newBone.name = mesh->mBones[i]->mName;
-			newBone.offsetMatrix = aiMatrix4x4ToGlm(mesh->mBones[i]->mOffsetMatrix);
-			newBone.transformation = glm::mat4(1.0f);
-
-			for (unsigned int j = 0; j < mesh->mBones[i]->mNumWeights; j++) {
-				unsigned int VertexID = mesh->mBones[i]->mWeights[j].mVertexId;
-				float Weight = mesh->mBones[i]->mWeights[j].mWeight;
-				newBone.push( VertexID, Weight );
-			}
-
-			bones.push_back(newBone);
-		}
 		// cout << "NumFaces: " << mesh->mNumFaces << endl;
 
         // now wak through each of the mesh's faces (a face is a mesh its triangle) and retrieve the corresponding vertex indices.
@@ -372,7 +416,7 @@ private:
 
 	void ReadNodeHierarchy(float AnimationTime, const aiNode* pNode, const glm::mat4& ParentTransform)
 	{
-		if (pNode == nullptr || scene == nullptr) return;
+		if (pNode == nullptr || scene == nullptr || scene->mNumAnimations == 0) return;
 
 		string NodeName(pNode->mName.data);
 
@@ -385,26 +429,22 @@ private:
 		//cout << "valid animation" << endl;
 
 		//aiMatrix4x4 NodeTransformation(pNode->mTransformation);
-		aiMatrix4x4 NodeTransformation;
+		aiMatrix4x4 NodeTransformation(pNode->mTransformation);
 
 		const aiNodeAnim* pNodeAnim = FindNodeAnim(pAnimation, NodeName);
 		
 		if (pNodeAnim != nullptr) {
-			aiVector3D Scaling;
-			CalcInterpolatedScaling(Scaling, AnimationTime, pNodeAnim);
-			aiMatrix4x4 ScalingM;
-			if (ScalingM.IsIdentity()) 
-				aiMatrix4x4::Scaling(Scaling, ScalingM);
-
+			aiVector3D Scaling, Translation;
 			aiQuaternion RotationQ;
-			CalcInterpolatedRotation(RotationQ, AnimationTime, pNodeAnim);
+			NodeTransformation.Decompose(Scaling, RotationQ, Translation);
+			if (pNodeAnim->mNumScalingKeys > 0) CalcInterpolatedScaling(Scaling, AnimationTime, pNodeAnim);
+			if (pNodeAnim->mNumRotationKeys > 0) CalcInterpolatedRotation(RotationQ, AnimationTime, pNodeAnim);
+			if (pNodeAnim->mNumPositionKeys > 0) CalcInterpolatedPosition(Translation, AnimationTime, pNodeAnim);
+			aiMatrix4x4 ScalingM;
+			aiMatrix4x4::Scaling(Scaling, ScalingM);
 			aiMatrix4x4 RotationM(RotationQ.GetMatrix());
-
-			aiVector3D Translation;
-			CalcInterpolatedPosition(Translation, AnimationTime, pNodeAnim);
 			aiMatrix4x4 TranslationM;
-			if (ScalingM.IsIdentity())
-				aiMatrix4x4::Translation(Translation, TranslationM);
+			aiMatrix4x4::Translation(Translation, TranslationM);
 
 			// Combine the above transformations
 			NodeTransformation = TranslationM * RotationM * ScalingM;
@@ -448,6 +488,8 @@ private:
 
 	void CalcInterpolatedScaling(aiVector3D& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
+		if (AnimationTime <= (float)pNodeAnim->mScalingKeys[0].mTime) { Out = pNodeAnim->mScalingKeys[0].mValue; return; }
+		if (AnimationTime >= (float)pNodeAnim->mScalingKeys[pNodeAnim->mNumScalingKeys - 1].mTime) { Out = pNodeAnim->mScalingKeys[pNodeAnim->mNumScalingKeys - 1].mValue; return; }
 		if (pNodeAnim->mNumScalingKeys == 1) {
 			Out = pNodeAnim->mScalingKeys[0].mValue;
 			return;
@@ -482,6 +524,8 @@ private:
 
 	void CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
+		if (AnimationTime <= (float)pNodeAnim->mRotationKeys[0].mTime) { Out = pNodeAnim->mRotationKeys[0].mValue; return; }
+		if (AnimationTime >= (float)pNodeAnim->mRotationKeys[pNodeAnim->mNumRotationKeys - 1].mTime) { Out = pNodeAnim->mRotationKeys[pNodeAnim->mNumRotationKeys - 1].mValue; return; }
 		// we need at least two values to interpolate...
 		if (pNodeAnim->mNumRotationKeys == 1) {
 			Out = pNodeAnim->mRotationKeys[0].mValue;
@@ -530,6 +574,8 @@ private:
 
 	void CalcInterpolatedPosition(aiVector3D& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
+		if (AnimationTime <= (float)pNodeAnim->mPositionKeys[0].mTime) { Out = pNodeAnim->mPositionKeys[0].mValue; return; }
+		if (AnimationTime >= (float)pNodeAnim->mPositionKeys[pNodeAnim->mNumPositionKeys - 1].mTime) { Out = pNodeAnim->mPositionKeys[pNodeAnim->mNumPositionKeys - 1].mValue; return; }
 		if (pNodeAnim->mNumPositionKeys == 1) {
 			Out = pNodeAnim->mPositionKeys[0].mValue;
 			return;

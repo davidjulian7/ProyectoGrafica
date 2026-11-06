@@ -36,6 +36,8 @@ inline const std::map<std::string, Ficha>& Fichas()
           "Vive entre los tentáculos de la anémona sin ser picado gracias a una capa de moco. Si la anémona se blanquea, pierde su refugio.", true } },
         { "Pez cirujano azul", { "Pez cirujano azul", "FAUNA", "Preocupación menor",
           "Tiene una espina afilada como bisturí junto a la cola. Come algas y evita que cubran a los corales.", true } },
+        { "Pez loro", { "Pez loro", "FAUNA", "Preocupación menor",
+          "Raspa algas de las rocas con su pico fusionado. Al triturar coral muerto, produce parte de la arena de las playas tropicales.", true } },
         { "Caballito de mar", { "Caballito de mar", "FAUNA", "Varias especies vulnerables",
           "Es el macho quien guarda los huevos en una bolsa en su vientre hasta que nacen las crías.", true } },
         { "Tortuga marina", { "Tortuga marina", "EN PELIGRO", "Tortuga verde: En peligro (UICN)",

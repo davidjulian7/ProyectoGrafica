@@ -32,6 +32,7 @@ public:
 	
 	map<string, unsigned int> m_BoneMapping; // maps a bone name to its index
 	unsigned int m_NumBones;
+	int m_BoneGroups = 1;
 	vector<BoneInfo> m_BoneInfo;
 	glm::mat4 m_GlobalInverseTransform;
 	unsigned int texture_gl;
@@ -68,6 +69,7 @@ public:
 		bool animar = animSegundos >= 0.0f && TieneAnimacion();
 		shader.setInt("uSkinning", animar ? 1 : 0);
 		if (animar) {
+			shader.setInt("uBoneGroups", m_BoneGroups);
 			ActualizarPose(animSegundos);
 			SubirHuesos(shader);
 		}
@@ -280,6 +282,23 @@ private:
 			m_BoneMapping[bname] = (unsigned int)bones.size();
 			bones.push_back(newBone);
 		}
+		std::vector<std::vector<std::pair<float, float>>> influencias;
+		if (mesh->mNumBones > 0) influencias.resize(mesh->mNumVertices);
+		for (unsigned int j = 0; j < mesh->mNumBones; j++) {
+			string bname(mesh->mBones[j]->mName.data);
+			auto bit = m_BoneMapping.find(bname);
+			if (bit == m_BoneMapping.end()) continue;
+			float gId = (float)bit->second;
+			for (unsigned int k = 0; k < mesh->mBones[j]->mNumWeights; k++) {
+				const aiVertexWeight& w = mesh->mBones[j]->mWeights[k];
+				if (w.mVertexId < mesh->mNumVertices)
+					influencias[w.mVertexId].emplace_back(gId, w.mWeight);
+			}
+		}
+		for (const auto& vertexInfluencias : influencias) {
+			int grupos = (int)((vertexInfluencias.size() + MAX_NUM_BONES - 1) / MAX_NUM_BONES);
+			if (grupos > m_BoneGroups) m_BoneGroups = std::min(grupos, 3);
+		}
 
         // Walk through each of the mesh's vertices
         for(unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -335,31 +354,15 @@ private:
 				vertex.Weights2[pb] = 0.0f;
 				vertex.Weights3[pb] = 0.0f;
 			}
-			m_NumBones = mesh->mNumBones;
-			for (unsigned int j = 0; j < mesh->mNumBones; j++) {
-				string bname(mesh->mBones[j]->mName.data);
-				auto bit = m_BoneMapping.find(bname);
-				if (bit == m_BoneMapping.end()) continue;
-				float gId = (float)bit->second;
-
-				for (unsigned int k = 0; k < mesh->mBones[j]->mNumWeights; k++) {
-					unsigned int VertexID = mesh->mBones[j]->mWeights[k].mVertexId;
-					float Weight = (float)(mesh->mBones[j]->mWeights[k].mWeight);
-					if ( VertexID == i && bcount < MAX_NUM_BONES ) {
-						vertex.IDs1[bcount] = gId;
-						vertex.Weights1[bcount] = Weight;
-						bcount++;
-					}
-					if (VertexID == i && bcount >= MAX_NUM_BONES && bcount < 2*MAX_NUM_BONES) {
-						vertex.IDs2[bcount - MAX_NUM_BONES] = gId;
-						vertex.Weights2[bcount - MAX_NUM_BONES] = Weight;
-						bcount++;
-					}
-					if (VertexID == i && bcount >= 2 * MAX_NUM_BONES && bcount < 3 * MAX_NUM_BONES) {
-						vertex.IDs3[bcount - 2*MAX_NUM_BONES] = gId;
-						vertex.Weights3[bcount - 2*MAX_NUM_BONES] = Weight;
-						bcount++;
-					}
+			if (i < influencias.size()) {
+				glm::vec4* ids[] = { &vertex.IDs1, &vertex.IDs2, &vertex.IDs3 };
+				glm::vec4* pesos[] = { &vertex.Weights1, &vertex.Weights2, &vertex.Weights3 };
+				for (const auto& influencia : influencias[i]) {
+					if (bcount >= 3 * MAX_NUM_BONES) break;
+					int grupo = bcount / MAX_NUM_BONES, indice = bcount % MAX_NUM_BONES;
+					(*ids[grupo])[indice] = influencia.first;
+					(*pesos[grupo])[indice] = influencia.second;
+					bcount++;
 				}
 			}
 			vertices.push_back(vertex);

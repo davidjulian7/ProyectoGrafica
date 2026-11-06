@@ -879,6 +879,7 @@ private:
             elementos.push_back(a);
         }
         Elemento payasos = Nadador("PezPayaso", c, MOV_CARDUMEN, glm::vec3(-6.0f, 0.9f, -4.4f), 1.1f, 0.6f, "Pez payaso");
+		payasos.rotExtra = glm::vec3(0.0f, 180.0f, 0.0f);
         payasos.miembros = 6; payasos.dispersion = 0.5f; payasos.velNado = 12.0f; payasos.sobreSuelo = true; payasos.oscAmp = 0.2f;
         elementos.push_back(payasos);
 
@@ -893,23 +894,29 @@ private:
         corona1.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta la estrella horizontalmente
         corona1.interactivo = true;
         corona1.etiqueta = "Estrella corona de espinas";
+		MatOpaco(corona1);
         elementos.push_back(corona1);
 
         Elemento corona2 = Fijo("EstrellaCorona", c, glm::vec3(-2.5f, 0.05f, 6.5f), 120, 0.9f);
         corona2.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta la estrella horizontalmente
         corona2.interactivo = true;
         corona2.etiqueta = "Estrella corona de espinas";
+		MatOpaco(corona2);
         elementos.push_back(corona2);
 
         // Pepino de mar (en zonas más arenosas / cerca del pasto marino)
         Elemento pepino1 = Fijo("PepinoMar", c, glm::vec3(-12.0f, 0.0f, 8.5f), 75, 1.0f);
+		pepino1.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta el pepino horizontalmente
         pepino1.interactivo = true;
         pepino1.etiqueta = "Pepino de mar";
+		MatPlastico(pepino1);
         elementos.push_back(pepino1);
 
         Elemento pepino2 = Fijo("PepinoMar", c, glm::vec3(3.0f, 0.0f, 10.0f), 210, 1.1f);
+		pepino2.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta el pepino horizontalmente
         pepino2.interactivo = true;
         pepino2.etiqueta = "Pepino de mar";
+		MatPlastico(pepino2);
         elementos.push_back(pepino2);
 
         // 17 Pradera de pasto marino con 08 manati y 03 caballitos de mar
@@ -938,6 +945,7 @@ private:
         pulpo.interactivo = true; pulpo.etiqueta = "Pulpo"; pulpo.camuflaje = true; pulpo.mecer = 0.3f; pulpo.fase = 1.0f;
         elementos.push_back(pulpo);
         Elemento langosta = Fijo("langosta", c, glm::vec3(9.0f, 0.02f, -6.5f), 160, 1.0f);
+		langosta.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f);
         langosta.interactivo = true; langosta.etiqueta = "Langosta";
         elementos.push_back(langosta);
         langosta.pos = glm::vec3(-3.5f, 0.02f, 10.5f); langosta.yaw = 20; elementos.push_back(langosta);
@@ -953,6 +961,7 @@ private:
         cirujanos.miembros = 7; cirujanos.dispersion = 1.0f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true;
         elementos.push_back(cirujanos);
         Elemento globo = Nadador("PezGlobo", c, MOV_ORBITA, glm::vec3(-1.0f, 1.8f, 8.0f), 2.5f, 0.25f, "Pez globo");
+		globo.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f);
         globo.inflable = true; globo.sobreSuelo = true; globo.ondula = 0.03f; globo.oscAmp = 0.3f; elementos.push_back(globo);
         globo.pos = glm::vec3(12.0f, 2.2f, 4.0f); globo.vel = -0.2f; globo.fase = 2.0f; elementos.push_back(globo);
         globo.pos = glm::vec3(1.0f, 2.5f, -1.0f); globo.radio = 4.0f; globo.vel = 0.15f; globo.fase = 4.0f; elementos.push_back(globo);

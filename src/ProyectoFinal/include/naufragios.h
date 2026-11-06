@@ -149,7 +149,7 @@ public:
         // --- fauna: los nativos regresan al retirar invasores y limpiar
         float fl = leonesTotal ? (float)leonesRetirados / leonesTotal : 1.0f;
         for (auto& e : el)
-            if (e.mov == MOV_CARDUMEN && (e.etiqueta == "Roncador" || e.etiqueta == "Pez cirujano azul"))
+            if (e.mov == MOV_CARDUMEN && e.etiqueta == "Roncador")
                 e.presencia = 0.15f + 0.55f * fl + 0.30f * limpieza;
 
         // --- el cangrejo cambia su lata por una concha natural

@@ -1516,9 +1516,6 @@ private:
         Elemento roncadores = Nadador("roncador", c, MOV_CARDUMEN, glm::vec3(1.0f, 3.5f, 1.0f), 7.0f, 0.3f, "Roncador");
         roncadores.miembros = 18; roncadores.dispersion = 1.4f; roncadores.velNado = 12.0f; roncadores.sobreSuelo = true; roncadores.presencia = 0.15f;
         elementos.push_back(roncadores);
-        Elemento cirujanos = Nadador("Pezcirujano", "arrecifes", MOV_CARDUMEN, glm::vec3(-6.0f, 4.5f, -1.0f), 9.0f, -0.25f, "Pez cirujano azul");
-        cirujanos.miembros = 10; cirujanos.dispersion = 1.2f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true; cirujanos.presencia = 0.15f;
-        elementos.push_back(cirujanos);
 
         // ---------------- 48 tiburon blanco y 69 medusas
         Elemento tiburon = Nadador("Tiburon", c, MOV_ORBITA, glm::vec3(0.0f, 9.0f, 0.0f), 20.0f, 0.10f, "Tiburon");

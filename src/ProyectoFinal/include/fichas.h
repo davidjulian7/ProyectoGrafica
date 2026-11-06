@@ -73,6 +73,13 @@ inline const std::map<std::string, Ficha>& Fichas()
         { "Bacalao", { "Bacalao", "FAUNA", "Vulnerable (UICN)", "Fue tan pescado en el Atlántico Norte que algunas poblaciones colapsaron en los años 90.", true } },
         { "Plataforma de hielo", { "Plataforma de hielo", "HÁBITAT", "Hielo marino", "El hielo marino del Ártico en verano se ha reducido drásticamente desde 1979.", false } },
         { "Iceberg", { "Iceberg", "HÁBITAT", "Hielo de glaciar", "Solo vemos cerca de una décima parte: el resto queda bajo el agua.", false } },
+        { "Orca", { "Orca", "FAUNA", "Datos insuficientes (UICN)", "Es el depredador tope del océano: caza en manada y también se alimenta de focas y pingüinos.", true } },
+        { "Narval", { "Narval", "FAUNA", "Casi amenazado (UICN)", "Su 'cuerno' es un diente largo. Vive bajo el hielo del Ártico y es muy sensible a su pérdida.", true } },
+        { "Cachalote", { "Cachalote", "FAUNA", "Vulnerable (UICN)", "Bucea más de mil metros para cazar calamares gigantes en la oscuridad.", true } },
+        { "Calamar colosal", { "Calamar colosal", "FAUNA", "Preocupación menor (UICN)", "Es el invertebrado más grande que existe y casi nunca se ha visto vivo.", true } },
+        { "Leon marino", { "León marino", "FAUNA", "Varía por especie", "Descansa en costas y plataformas de hielo; si cambia su comida por el calentamiento, pasa hambre.", true } },
+        { "Pez dracoide", { "Pez dracoide", "FAUNA", "Varía por especie", "Algunos peces de hielo antárticos tienen la sangre transparente porque no tienen hemoglobina.", true } },
+        { "Pescado", { "Pescado", "FAUNA", "Alimento", "Los peces como este son el alimento de focas, pingüinos y osos polares.", false } },
 
         // ---------------- Zona 3: Naufragios
         { "Submarino hundido", { "Submarino hundido", "NAUFRAGIO", "Huella humana", "Los restos de barcos y submarinos pueden liberar combustible y metales durante décadas.", false } },
@@ -99,7 +106,7 @@ inline const std::map<std::string, Ficha>& Fichas()
         { "Barco hundido", { "Barco de madera hundido", "NAUFRAGIO", "Restos de un velero", "Con los años, los naufragios se vuelven arrecifes artificiales: corales, esponjas y peces los colonizan.", false } },
         { "Timon", { "Timón de barco", "NAUFRAGIO", "Restos de un barco de madera", "La madera hundida es devorada por moluscos llamados teredos o 'gusanos de barco'.", false } },
         { "Columna", { "Columna clásica", "NAUFRAGIO", "Ruinas sumergidas", "Hay ciudades antiguas bajo el mar, como Baia en Italia, hundidas por la actividad volcánica de la zona.", false } },
-        { "Cofre del tesoro", { "Cofre del tesoro", "NAUFRAGIO", "Cerrado", "Se abrirá cuando el fondo esté limpio y sin peces león.", false } },
+        { "Cofre del tesoro", { "Cofre del tesoro", "NAUFRAGIO", "Recompensa final", "Guarda la recompensa por limpiar el naufragio. Termina la misión y acércate para abrirlo.", false } },
         { "Senal de transito", { "Señal de tránsito", "BASURA", "Huella humana", "Objetos de la ciudad llegan al mar arrastrados por ríos, drenajes y tormentas.", false } },
         { "Dron de exploracion", { "Dron submarino ROV-01", "GUÍA", "Vehículo de exploración", "Te acompaña y señala con un marcador la basura más cercana. Los ROV reales se usan para estudiar y limpiar el fondo marino.", false } },
         { "Letrero: como limpiar", { "Cómo limpiar este fondo", "INSTRUCCIONES", "Letrero", "Apunta y haz clic en los residuos. Retira a los peces león. Mantén presionado el clic sobre la red para liberar a la tortuga. Retira el barril tóxico.", false } },

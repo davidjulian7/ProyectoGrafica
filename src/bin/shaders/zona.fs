@@ -63,6 +63,7 @@ float causticas(vec2 p, float t)
 void main()
 {
     vec4 tex = texture(texture_diffuse1, vUV);
+    if (tex.a < 0.5) discard;   // recorte: partes transparentes del PNG (abanico de mar, hojas...)
     vec3 base = tex.rgb * uTinte;
     float gris = dot(tex.rgb, vec3(0.333));
     // Blanqueamiento por manchas: el coral pierde color en zonas irregulares que crecen

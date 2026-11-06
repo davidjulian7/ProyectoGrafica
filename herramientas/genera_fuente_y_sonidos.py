@@ -100,3 +100,13 @@ guardar('descubrir', x)
 # recogida (para Naufragios): golpe corto y brillante
 t = np.arange(int(0.5 * SR)) / SR
 guardar('recoger', np.sin(2 * np.pi * (660 + 400 * t) * t) * np.exp(-t * 9) + g.normal(0, 0.15, len(t)) * np.exp(-t * 40))
+
+# lluvia de monedas del cofre: muchos tintineos metalicos (parciales inarmonicos) que se van espaciando
+t = np.arange(int(3.2 * SR)) / SR; x = np.zeros_like(t)
+for k in range(140):
+    d = (g.random() ** 1.8) * 2.8; i = int(d * SR)
+    f0 = g.uniform(2200, 3600); amp = g.uniform(0.15, 0.5) * (1.0 - d / 3.4)
+    n = int(0.25 * SR); tt = np.arange(n) / SR
+    clin = sum(np.sin(2 * np.pi * f0 * r * tt) * np.exp(-tt * (30 + 12 * j)) for j, r in enumerate((1.0, 1.53, 2.31, 3.07)))
+    x[i:i + n] += clin[:len(x) - i] * amp
+guardar('monedas', x)

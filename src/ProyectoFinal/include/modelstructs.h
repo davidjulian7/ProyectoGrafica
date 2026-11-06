@@ -20,11 +20,13 @@
 #include <map>
 #include <vector>
 #include <stdlib.h>
+#include <cmath>
 using namespace std;
 
 #include <glm/gtx/string_cast.hpp>
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false);
+unsigned int TextureFromColor(const aiColor4D &color);
 
 struct BoneInfo
 {
@@ -156,6 +158,26 @@ unsigned int TextureFromFile(const char *path, const string &directory, bool gam
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
 
+    return textureID;
+}
+
+// Textura de 1x1 con el color del material: para piezas de color liso que no
+// traen imagen. Sin esto se usaria la ultima textura que quedo activa.
+// El color de Blender viene en espacio lineal; se pasa a sRGB como las imagenes.
+unsigned int TextureFromColor(const aiColor4D &color)
+{
+    auto aSRGB = [](float c) {
+        c = c < 0.0f ? 0.0f : (c > 1.0f ? 1.0f : c);
+        return (unsigned char)(powf(c, 1.0f / 2.2f) * 255.0f + 0.5f);
+    };
+    unsigned char px[4] = { aSRGB(color.r), aSRGB(color.g), aSRGB(color.b), 255 };
+
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     return textureID;
 }
 #endif

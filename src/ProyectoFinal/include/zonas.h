@@ -842,7 +842,7 @@ private:
         caballito.pos = glm::vec3(-16.0f, 0.6f, 14.0f); caballito.yaw = 130; caballito.fase = 4.0f; elementos.push_back(caballito);
 
         // 07 Almejas, 05 pulpo y 15 langostas en el fondo
-        Elemento almeja = Fijo("almejagigante", c, glm::vec3(7.5f, 0.2f, -6.0f), 30, 1.0f);
+        Elemento almeja = Fijo("Almeja", c, glm::vec3(7.5f, 0.2f, -6.0f), 30, 1.0f);
         almeja.interactivo = true; almeja.etiqueta = "Almeja gigante"; almeja.esCoral = true; almeja.sensibilidad = 0.7f;
         almeja.tinte = glm::vec3(0.75f, 0.85f, 1.15f);
         {   // KF: la almeja abre y cierra la concha (animacion por cuadros clave de Julian)
@@ -869,7 +869,7 @@ private:
         Elemento cirujanos = Nadador("Pezcirujano", c, MOV_CARDUMEN, glm::vec3(7.0f, 2.6f, -9.0f), 4.0f, -0.4f, "Pez cirujano azul");
         cirujanos.miembros = 7; cirujanos.dispersion = 1.0f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true;
         elementos.push_back(cirujanos);
-        Elemento globo = Nadador("pez_globo", c, MOV_ORBITA, glm::vec3(-1.0f, 1.8f, 8.0f), 2.5f, 0.25f, "Pez globo");
+        Elemento globo = Nadador("PezGlobo", c, MOV_ORBITA, glm::vec3(-1.0f, 1.8f, 8.0f), 2.5f, 0.25f, "Pez globo");
         globo.inflable = true; globo.sobreSuelo = true; globo.ondula = 0.03f; globo.oscAmp = 0.3f; elementos.push_back(globo);
         globo.pos = glm::vec3(12.0f, 2.2f, 4.0f); globo.vel = -0.2f; globo.fase = 2.0f; elementos.push_back(globo);
         globo.pos = glm::vec3(1.0f, 2.5f, -1.0f); globo.radio = 4.0f; globo.vel = 0.15f; globo.fase = 4.0f; elementos.push_back(globo);

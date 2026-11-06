@@ -489,32 +489,82 @@ void processInput(GLFWwindow* window)
 		}
 	}
 	else {
+		static bool caminando = false;      // Aguas Frias: el buzo esta de pie sobre el hielo
+		static float velCaida = 0.0f;
+		bool frias = estadoActual == AGUAS_FRIAS;
+		float supY = escenario.cfg.superficieY;
 		glm::vec3 wish(0.0f);
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) wish += camera.Front;
 		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) wish -= camera.Front;
 		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) wish -= camera.Right;
 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) wish += camera.Right;
-		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) wish.y += 1.0f;          // subir
+		bool saltar = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+		if (saltar) wish.y += 1.0f;          // subir
 		if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
 		    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) wish.y -= 1.0f;                // bajar
-		if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
 		float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.0f : 1.0f;
+		if (!frias) caminando = false;
 
-		diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
-		diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
-		camera.Position += diverVelocity * deltaTime;
+		// salir del agua: si hay hielo justo a la altura de los ojos, el buzo se sube
+		if (frias && !caminando) {
+			float gy;
+			if (camera.Position.y > supY - 1.2f && escenario.HieloBajo(camera.Position.x, camera.Position.z, camera.Position.y + 1.3f, animTime, gy) && gy > supY + 0.2f) {
+				caminando = true; velCaida = 0.0f; diverVelocity = glm::vec3(0.0f);
+			}
+		}
 
-		// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
-		float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.7f;
-		if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
-		float techo = escenario.cfg.superficieY - 0.6f;
-		if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
+		if (caminando) {
+			glm::vec3 fwd(camera.Front.x, 0.0f, camera.Front.z), rgt(camera.Right.x, 0.0f, camera.Right.z);
+			glm::vec3 mover(0.0f);
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) mover += fwd;
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) mover -= fwd;
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) mover -= rgt;
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) mover += rgt;
+			if (glm::length(mover) > 0.001f) mover = glm::normalize(mover) * (aleteo > 1.0f ? 7.0f : 4.5f);
+			float k = 1.0f - std::exp(-8.0f * deltaTime);
+			diverVelocity.x += (mover.x - diverVelocity.x) * k;
+			diverVelocity.z += (mover.z - diverVelocity.z) * k;
+			float pie = camera.Position.y - 1.7f, alto;
+			float nx = camera.Position.x + diverVelocity.x * deltaTime, nz = camera.Position.z + diverVelocity.z * deltaTime;
+			if (escenario.HieloBajo(nx, nz, pie + 40.0f, animTime, alto) && alto > pie + 1.0f && alto > supY + 0.2f) { diverVelocity.x = diverVelocity.z = 0.0f; }   // pared de hielo
+			else { camera.Position.x = nx; camera.Position.z = nz; }
+			velCaida -= 14.0f * deltaTime;
+			camera.Position.y += velCaida * deltaTime;
+			pie = camera.Position.y - 1.7f;
+			float gy;
+			bool apoyo = false;
+			if (escenario.HieloBajo(camera.Position.x, camera.Position.z, pie + 1.0f, animTime, gy) && pie <= gy + 0.02f && velCaida <= 0.0f) {
+				float meta = gy + 1.7f;
+				camera.Position.y = camera.Position.y + 10.0f * deltaTime < meta ? camera.Position.y + 10.0f * deltaTime : meta;
+				velCaida = 0.0f; apoyo = true;
+			}
+			if (apoyo && saltar) velCaida = 6.5f;
+			if (!apoyo && camera.Position.y < supY + 0.45f) {   // cayo al agua
+				caminando = false;
+				diverVelocity.y = velCaida * 0.35f;
+			}
+			else diverVelocity.y = apoyo ? 0.0f : velCaida;
+		}
+		else {
+			if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
+			diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
+			diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
+			camera.Position += diverVelocity * deltaTime;
+
+			// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
+			float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.7f;
+			if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
+			float techo = frias ? supY + 0.6f : supY - 0.6f;
+			if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
+		}
+		escenario.buzoDePie = frias && caminando;
 		glm::vec2 xz(camera.Position.x, camera.Position.z);
 		if (glm::length(xz) > 42.0f) {
 			xz = glm::normalize(xz) * 42.0f;
 			camera.Position.x = xz.x; camera.Position.z = xz.y;
 		}
 	}
+	escenario.buzoVel = diverVelocity;
 
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

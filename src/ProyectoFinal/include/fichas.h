@@ -81,6 +81,8 @@ inline const std::map<std::string, Ficha>& Fichas()
         { "Calamar colosal", { "Calamar colosal", "FAUNA", "Preocupación menor (UICN)", "Es el invertebrado más grande que existe y casi nunca se ha visto vivo.", true } },
         { "Leon marino", { "León marino", "FAUNA", "Varía por especie", "Descansa en costas y plataformas de hielo; si cambia su comida por el calentamiento, pasa hambre.", true } },
         { "Pez dracoide", { "Pez dracoide", "FAUNA", "Varía por especie", "Algunos peces de hielo antárticos tienen la sangre transparente porque no tienen hemoglobina.", true } },
+        { "Cueva de hielo", { "Cueva de hielo", "HÁBITAT", "Hielo marino", "Los osos polares usan cuevas de hielo y nieve para refugiarse y criar a sus oseznos; con el deshielo, estos refugios desaparecen.", false } },
+        { "Rompehielos", { "Rompehielos", "EMBARCACIÓN", "Tráfico marítimo", "Abre canales en el hielo, pero su paso calienta el agua y deja hollín que oscurece la nieve. Con menos hielo, más barcos navegan el Ártico y se acelera el deshielo.", false } },
         { "Pescado", { "Pescado", "FAUNA", "Alimento", "Los peces como este son el alimento de focas, pingüinos y osos polares.", false } },
 
         // ---------------- Zona 3: Naufragios

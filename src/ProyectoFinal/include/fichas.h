@@ -106,7 +106,7 @@ inline const std::map<std::string, Ficha>& Fichas()
         { "Barco hundido", { "Barco de madera hundido", "NAUFRAGIO", "Restos de un velero", "Con los años, los naufragios se vuelven arrecifes artificiales: corales, esponjas y peces los colonizan.", false } },
         { "Timon", { "Timón de barco", "NAUFRAGIO", "Restos de un barco de madera", "La madera hundida es devorada por moluscos llamados teredos o 'gusanos de barco'.", false } },
         { "Columna", { "Columna clásica", "NAUFRAGIO", "Ruinas sumergidas", "Hay ciudades antiguas bajo el mar, como Baia en Italia, hundidas por la actividad volcánica de la zona.", false } },
-        { "Cofre del tesoro", { "Cofre del tesoro", "NAUFRAGIO", "Cerrado", "Se abrirá cuando el fondo esté limpio y sin peces león.", false } },
+        { "Cofre del tesoro", { "Cofre del tesoro", "NAUFRAGIO", "Recompensa final", "Guarda la recompensa por limpiar el naufragio. Termina la misión y acércate para abrirlo.", false } },
         { "Senal de transito", { "Señal de tránsito", "BASURA", "Huella humana", "Objetos de la ciudad llegan al mar arrastrados por ríos, drenajes y tormentas.", false } },
         { "Dron de exploracion", { "Dron submarino ROV-01", "GUÍA", "Vehículo de exploración", "Te acompaña y señala con un marcador la basura más cercana. Los ROV reales se usan para estudiar y limpiar el fondo marino.", false } },
         { "Letrero: como limpiar", { "Cómo limpiar este fondo", "INSTRUCCIONES", "Letrero", "Apunta y haz clic en los residuos. Retira a los peces león. Mantén presionado el clic sobre la red para liberar a la tortuga. Retira el barril tóxico.", false } },

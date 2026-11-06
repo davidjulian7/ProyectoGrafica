@@ -118,6 +118,7 @@ struct ZonaConfig {
 };
 
 struct Burbuja { glm::vec3 p; float vel; float r; float fase; };
+struct MonedaVoladora { glm::vec3 p, v, eje; float ang, vAng, brillo; bool quieta; };   // lluvia de monedas del cofre
 
 class Escenario
 {
@@ -151,7 +152,7 @@ public:
     void Entrar(int z, Camera& cam)
     {
         zona = z;
-        elementos.clear(); burbujas.clear(); animaciones.clear(); seleccion = -1;
+        elementos.clear(); burbujas.clear(); animaciones.clear(); monedasVuelo.clear(); seleccion = -1;
         // terreno primero: los elementos se colocan sobre el al construirse
         const char* terrenos[] = { "", "terreno_arrecifes", "terreno_aguas_frias", "terreno_naufragios" };
         const char* carpetas[] = { "", "arrecifes", "aguas_frias", "naufragios" };
@@ -199,6 +200,22 @@ public:
     // Burbujas y animaciones. 'exhala' agrega las burbujas del regulador del buzo.
     std::vector<Elemento>& Elementos() { return elementos; }
 
+    // Lanza 'n' monedas desde 'origen' como una fuente que cae girando al fondo (cofre del tesoro)
+    void LanzarMonedas(const glm::vec3& origen, int n)
+    {
+        if (!modeloMoneda) modeloMoneda = Cargar("moneda", "naufragios");
+        for (int i = 0; i < n; i++) {
+            glm::vec3 r = Aleatorio3(i * 7 + (int)monedasVuelo.size());
+            float ang = Aleatorio(i, 31) * 6.2832f, abre = 0.6f + 1.8f * Aleatorio(i, 32);
+            MonedaVoladora m;
+            m.p = origen + glm::vec3(r.x * 0.25f, Aleatorio(i, 33) * 0.2f, r.z * 0.15f);
+            m.v = glm::vec3(cosf(ang) * abre, 3.2f + 2.6f * Aleatorio(i, 34), sinf(ang) * abre + 0.6f);
+            m.eje = glm::normalize(glm::vec3(r.x, 0.3f + fabsf(r.y), r.z) + glm::vec3(0.001f));
+            m.ang = 0.0f; m.vAng = 6.0f + 10.0f * Aleatorio(i, 35); m.brillo = Aleatorio(i, 36) * 6.28f; m.quieta = false;
+            monedasVuelo.push_back(m);
+        }
+    }
+
     // Posicion actual (centro del primer miembro) de un elemento
     glm::vec3 Posicion(int i, float t) const { return glm::vec3(Matriz(elementos[i], i, 0, t)[3]); }
 
@@ -210,6 +227,16 @@ public:
     {
         if (dt > 0.1f) dt = 0.1f;
         bool exhalo = false;
+        for (MonedaVoladora& m : monedasVuelo) {
+            if (m.quieta) continue;
+            m.v.y -= 2.4f * dt;                         // bajo el agua caen despacio
+            m.v *= expf(-0.7f * dt);
+            m.p += m.v * dt; m.ang += m.vAng * dt;
+            float suelo = AlturaSuelo(m.p.x, m.p.z) + 0.02f;
+            if (m.p.y <= suelo && m.v.y < 0.0f) {      // al tocar el fondo quedan acostadas
+                m.p.y = suelo; m.quieta = true; m.eje = glm::vec3(0.0f, 1.0f, 0.0f);
+            }
+        }
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
             if (!e.inflable) continue;
@@ -447,6 +474,21 @@ public:
             DibujarElemento(e, (int)i, t);
         }
 
+        // monedas voladoras: oro metalico con destellos
+        if (modeloMoneda && !monedasVuelo.empty()) {
+            Comunes(glm::vec3(1.15f, 0.92f, 0.45f), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+            sh->setFloat("uSpecPower", 90.0f); sh->setFloat("uSpecInt", 1.6f); sh->setFloat("uMetalico", 1.0f);
+            for (const MonedaVoladora& m : monedasVuelo) {
+                if (!EnVista(m.p, 0.2f)) continue;
+                sh->setFloat("uEmision", 0.25f + 0.35f * (0.5f + 0.5f * sinf(t * 7.0f + m.brillo)));
+                glm::mat4 mm = glm::translate(glm::mat4(1.0f), m.p);
+                if (m.quieta) mm = glm::rotate(mm, m.brillo, glm::vec3(0.0f, 1.0f, 0.0f));
+                else mm = glm::rotate(mm, m.ang, m.eje);
+                sh->setMat4("model", glm::scale(mm, glm::vec3(2.4f)));
+                modeloMoneda->Draw(*sh);
+            }
+        }
+
         // 3) Superficie del agua vista desde abajo (Fresnel + ventana de Snell)
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         shSuperficie->use();
@@ -494,6 +536,8 @@ private:
     std::vector<Elemento> elementos;
     std::deque<AnimacionKF> animaciones;   // KF creadas por la zona (deque: punteros estables)
     std::vector<Burbuja> burbujas;
+    std::vector<MonedaVoladora> monedasVuelo;
+    Model* modeloMoneda = nullptr;
     std::vector<glm::vec3> fuentes;
     std::string terrenoArchivo, terrenoCarpeta;
     Model* terreno = nullptr;
@@ -973,20 +1017,31 @@ private:
 
         // ---------------- 52 submarino hundido: se asienta en el fondo al llegar (KF, una vez)
         Elemento sub = fijo("submarino", glm::vec3(0.0f), 25, 1.0f, "Submarino hundido");
-        sub.mov = MOV_KF; sub.kf = GuardarKF([&]() { AnimacionKF a = KF_SubmarinoAsienta(glm::vec3(3.0f, suelo(5.4f, -4.4f) + 0.1f, -2.0f)); a.loop = false; return a; }());
+        sub.mov = MOV_KF; sub.kf = GuardarKF([&]() { AnimacionKF a = KF_SubmarinoAsienta(glm::vec3(3.0f, suelo(5.4f, -4.4f) + 0.6f, -2.0f)); a.loop = false; return a; }());
         sub.kfInicio = 1.5f; MatMetalico(sub); elementos.push_back(sub);
 
-        // ---------------- 53/54 ruinas: muro con arcos, torre y columnas
-        Elemento muro = fijo("ruinas_muro", glm::vec3(-16.0f, -0.4f, -1.0f), 90, 1.0f, "Ruinas"); MatOpaco(muro); elementos.push_back(muro);
-        Elemento torre = fijo("ruinas_torre", glm::vec3(-18.0f, -0.6f, 9.0f), 20, 0.9f, "Ruinas"); MatOpaco(torre); elementos.push_back(torre);
-        float colX[] = { -12.0f, -9.0f, -12.0f, -9.0f }, colZ[] = { -4.0f, -4.0f, 3.0f, 3.0f };
+        // ---------------- 53/54 ruinas (modelos de Meshy): arcadas, balcones y columnas clasicas
+        // el marmol es casi blanco: el tinte lo envejece con sedimento y algas
+        const glm::vec3 marmolHundido(0.52f, 0.58f, 0.50f);
+        Elemento arcada = fijo("ruinas_arcada", glm::vec3(-16.5f, -0.3f, -1.5f), 90, 1.0f, "Ruinas"); MatOpaco(arcada); arcada.tinte = marmolHundido;
+        elementos.push_back(arcada);                                         // muro principal de arcos al fondo
+        arcada.pos = glm::vec3(-13.0f, -0.4f, 13.5f); arcada.yaw = 15; arcada.escala = 0.75f;
+        arcada.rotExtra = glm::vec3(0.0f, 0.0f, -4.0f); elementos.push_back(arcada);   // arcada menor, ligeramente inclinada
+        Elemento balcon = fijo("ruinas_balcon", glm::vec3(-20.5f, -0.4f, 7.0f), 60, 1.0f, "Ruinas"); MatOpaco(balcon); balcon.tinte = marmolHundido;
+        elementos.push_back(balcon);
+        balcon.pos = glm::vec3(-14.5f, -0.4f, -15.5f); balcon.yaw = 200; balcon.escala = 0.85f; elementos.push_back(balcon);
+        // pasillo de columnas que lleva hacia la arcada
+        float colX[] = { -12.5f, -12.5f, -9.5f, -9.5f }, colZ[] = { -6.0f, 1.0f, -6.0f, 1.0f };
+        float inclina[] = { 2.0f, -3.0f, 0.0f, 4.0f };
         for (int i = 0; i < 4; i++) {
-            Elemento col = fijo(i == 2 ? "columna_rota" : "columna", glm::vec3(colX[i], -0.3f, colZ[i]), (float)(i * 37), 1.0f, "Columna");
-            MatOpaco(col); elementos.push_back(col);
+            Elemento col = fijo("columna", glm::vec3(colX[i], -0.3f, colZ[i]), (float)(i * 23), 1.0f, "Columna");
+            col.rotExtra = glm::vec3(inclina[i], 0.0f, inclina[3 - i]); MatOpaco(col); col.tinte = marmolHundido; elementos.push_back(col);
         }
+        Elemento tumbada = fijo("columna", glm::vec3(-11.0f, 0.55f, 7.5f), 30, 0.95f, "Columna");   // ya derrumbada
+        tumbada.rotExtra = glm::vec3(0.0f, 0.0f, 88.0f); MatOpaco(tumbada); tumbada.tinte = marmolHundido * 0.9f; elementos.push_back(tumbada);
         Elemento caida = fijo("columna", glm::vec3(0.0f), 0, 0.9f, "Columna");   // se derrumba cuando te acercas (KF)
         caida.mov = MOV_KF; caida.kf = GuardarKF(KF_ColumnaDerrumbe(glm::vec3(-5.5f, suelo(-5.5f, 7.0f) - 0.2f, 7.0f), 75.0f));
-        caida.kfInicio = 1e6f; MatOpaco(caida); elementos.push_back(caida);
+        caida.kfInicio = 1e6f; MatOpaco(caida); caida.tinte = marmolHundido; elementos.push_back(caida);
         Elemento bloque = fijo("bloque", glm::vec3(0.0f, 0.2f, 0.0f), 0, 1, "Ruinas"); MatOpaco(bloque);
         Esparcir(bloque, 8, glm::vec2(-13.0f, 1.0f), 2.0f, 8.0f, 0.7f, 1.3f, 13);
 
@@ -1003,7 +1058,7 @@ private:
         glm::vec3 pc(1.5f, suelo(1.5f, 5.0f) - 0.05f, 5.0f);
         Elemento cofre = fijo("cofre", glm::vec3(pc.x, -0.05f, pc.z), 0, 1.0f, "Cofre del tesoro"); MatOpaco(cofre); elementos.push_back(cofre);
         Elemento tapa = fijo("cofre_tapa", glm::vec3(0.0f), 0, 1.0f, "Cofre del tesoro");
-        tapa.mov = MOV_KF; tapa.kf = GuardarKF(KF_TapaCofre(pc + glm::vec3(0.0f, 0.5f, -0.3f), 0.0f)); tapa.kfInicio = 1e6f; MatOpaco(tapa);
+        tapa.mov = MOV_KF; tapa.kf = GuardarKF(KF_TapaCofre(pc + glm::vec3(0.0f, 0.507f, -0.315f), 0.0f)); tapa.kfInicio = 1e6f; MatOpaco(tapa);   // bisagra del cofre de Meshy
         elementos.push_back(tapa);
         Elemento monedas = fijo("moneda", glm::vec3(pc.x + 0.7f, 0.0f, pc.z + 0.5f), 0, 1.0f, nullptr);
         monedas.miembros = 30; monedas.dispersion = 0.9f; monedas.presencia = 0.25f; monedas.emision = 0.35f; MatMetalico(monedas); elementos.push_back(monedas);
@@ -1084,7 +1139,7 @@ private:
         tiburon.ondula = 0.15f; tiburon.velNado = 3.0f; elementos.push_back(tiburon);
         for (int i = 0; i < 6; i++) {
             Elemento m = fijo("medusa", glm::vec3(-12.0f + i * 5.0f, 5.0f + (i % 3) * 2.5f, -6.0f + (i % 2) * 12.0f), 0, 0.8f + 0.1f * i, "Medusa");
-            m.sobreSuelo = false; m.mov = MOV_DERIVA; m.fase = i * 1.9f; m.pulsar = true; m.alpha = 0.6f; m.emision = 0.35f; m.fantasma = 0.35f;
+            m.sobreSuelo = false; m.mov = MOV_DERIVA; m.fase = i * 1.9f; m.pulsar = true; m.alpha = 0.78f; m.emision = 0.30f; m.fantasma = 0.25f;
             m.mecer = 0.5f; MatTraslucido(m); elementos.push_back(m);
         }
 

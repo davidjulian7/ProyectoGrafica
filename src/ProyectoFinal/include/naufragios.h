@@ -21,6 +21,7 @@
 #include <zonas.h>
 #include <menu.h>
 #include <fichas.h>
+#include <hud_comun.h>
 
 class MecanicaNaufragios
 {
@@ -31,6 +32,9 @@ public:
     bool tortugaLibre = false, cofreAbierto = false;
     // eventos de sonido (ProyectoFinal los reproduce y los apaga)
     bool sonarRecoger = false, sonarAlerta = false, sonarDescubrir = false;
+    bool verLista = false;                 // tecla L: lista de especies de la bitacora
+    bool completado = false;               // mision cumplida (basura, barril, red y peces leon)
+    bool sonarMonedas = false;
 
     void Reiniciar(Escenario& esc, float t)
     {
@@ -39,7 +43,7 @@ public:
         for (int i = 0; i < 5; i++) avisoTipo[i] = false;
         for (int i = 0; i < 5; i++) recogidos[i] = totales[i] = 0;
         avisos.clear(); registradas.clear(); ultimaMira.clear(); tiempoMira = 0.0f;
-        iDron = iRed = iTortuga = iBarril = iNube = iCLata = iCNat = iTapa = iMonedas = iColumna = iSub = -1;
+        iDron = iRed = iTortuga = iBarril = iNube = iCLata = iCNat = iTapa = iMonedas = iColumna = iSub = iCofre = -1;
         std::set<std::string> especies;
         auto& el = esc.Elementos();
         for (int i = 0; i < (int)el.size(); i++) {
@@ -54,6 +58,7 @@ public:
             else if (e.archivo == "cangrejo_lata") iCLata = i;
             else if (e.archivo == "cangrejoermitano" && !e.visible) iCNat = i;
             else if (e.archivo == "cofre_tapa") iTapa = i;
+            else if (e.archivo == "cofre") iCofre = i;
             else if (e.archivo == "moneda") iMonedas = i;
             else if (e.archivo == "columna" && e.mov == MOV_KF) iColumna = i;
             else if (e.archivo == "submarino") iSub = i;
@@ -62,10 +67,14 @@ public:
         }
         especies.insert("Tortuga marina");      // se registra al liberarla
         totalEspecies = (int)especies.size();
+        especiesLista = OrdenarEspecies(especies);
+        completado = false; tCompleto = -1.0f; verLista = false; fase = 0; tFase = 0.0f; monedasLanzadas = false;
         if (iSub >= 0) el[iSub].kfInicio = t + 1.5f;   // el submarino termina de hundirse frente al buzo
         Aviso("El fondo está invadido por basura y el agua está turbia. Lee el letrero frente a ti y empieza a limpiar: apunta a un residuo y haz clic.",
               glm::vec3(0.55f, 0.9f, 1.0f), 9.0f);
     }
+
+    void Tecla(int key) { if (key == GLFW_KEY_L) verLista = !verLista; }
 
     // Clic sobre el elemento 'idx' (o -1 si la mira no apunta a nada)
     void Clic(int idx, Escenario& esc, float t)
@@ -93,7 +102,8 @@ public:
         else if ((idx == iRed || idx == iTortuga) && !tortugaLibre)
             Aviso("Mantén presionado el clic sobre la red para cortarla.", glm::vec3(1.0f, 0.75f, 0.5f), 3.0f);
         else if (idx == iTapa || e.archivo == "cofre") {
-            if (!cofreAbierto) {
+            if (fase == 2) AbrirCofre(esc, t);
+            else if (!cofreAbierto && fase < 2) {
                 char b[160]; snprintf(b, sizeof(b), "El cofre está cerrado. Se abrirá cuando el fondo esté limpio (%d%%) y sin peces león (%d de %d).",
                                       (int)(limpieza * 100.0f + 0.5f), leonesRetirados, leonesTotal);
                 Aviso(b, glm::vec3(1.0f, 0.85f, 0.45f), 5.0f);
@@ -162,13 +172,31 @@ public:
             Aviso(leonesRetirados < leonesTotal ? "¡Retiraste toda la basura! Retira también a los peces león para abrir el cofre."
                                                 : "¡Fondo limpio!", glm::vec3(0.5f, 1.0f, 0.6f), 7.0f); }
 
-        // --- cofre: se abre cuando todo esta limpio y sin invasores
-        if (!cofreAbierto && limpieza >= 0.999f && leonesRetirados >= leonesTotal) {
-            cofreAbierto = true; sonarDescubrir = true;
-            if (iTapa >= 0) el[iTapa].kfInicio = t;
-            if (iMonedas >= 0) el[iMonedas].presencia = 1.0f;
-            Aviso("¡Se abrió el cofre! El verdadero tesoro es un océano limpio: retiraste toda la basura, liberaste a la tortuga y controlaste a la especie invasora.",
-                  glm::vec3(1.0f, 0.85f, 0.4f), 12.0f);
+        // --- secuencia final:
+        //  fase 1: anuncio "Mision cumplida"  ->  fase 2: el dron lleva al buzo al cofre
+        //  fase 3: al acercarse se abre el cofre y salen las monedas  ->  fase 4: "Te hiciste rico"
+        if (fase == 0 && limpieza >= 0.999f && leonesRetirados >= leonesTotal) {
+            fase = 1; tFase = 0.0f; completado = true; tCompleto = 0.0f; sonarDescubrir = true;
+        }
+        if (fase > 0) { tFase += dt; tCompleto += dt; }
+        if (fase == 1 && tFase > ANUNCIO) {
+            fase = 2; tFase = 0.0f; sonarAlerta = true;
+            Aviso("Tu recompensa te espera: nada hasta el cofre del tesoro. El dron te señala el camino.", glm::vec3(1.0f, 0.85f, 0.4f), 8.0f);
+        }
+        if (fase == 2 && iTapa >= 0) {
+            glm::vec3 pc = esc.Posicion(iTapa, t);
+            if (glm::length(cam.Position - pc) < 6.0f) AbrirCofre(esc, t);
+        }
+        if (fase == 3) {
+            float brillo = tFase < 1.0f ? tFase : 1.0f;      // el cofre se ilumina por dentro
+            if (iTapa >= 0) el[iTapa].emision = 0.15f + 0.35f * brillo;
+            if (iCofre >= 0) el[iCofre].emision = 0.15f + 0.45f * brillo;
+            if (!monedasLanzadas && tFase > 0.9f) {
+                monedasLanzadas = true; sonarMonedas = true;
+                esc.LanzarMonedas(esc.Posicion(iCofre, t) + glm::vec3(0.0f, 0.55f, 0.05f), 80);
+                if (iMonedas >= 0) el[iMonedas].presencia = 1.0f;
+            }
+            if (tFase > 2.5f) { fase = 4; tFase = 0.0f; sonarDescubrir = true; }
         }
 
         // --- dron guia: sigue al buzo y apunta a la basura mas cercana
@@ -179,6 +207,7 @@ public:
             float d = glm::length(esc.Posicion(i, t) - cam.Position);
             if (d < mejor) { mejor = d; objetivo = i; }
         }
+        if (fase == 2 && iTapa >= 0) { objetivo = iTapa; mejor = glm::length(esc.Posicion(iTapa, t) - cam.Position); }
         distObjetivo = mejor;
         if (objetivo >= 0) posObjetivo = esc.Posicion(objetivo, t);
         if (iDron >= 0) {
@@ -217,7 +246,10 @@ public:
             if (tortugaLibre) return "";
             color = glm::vec3(1.0f, 0.75f, 0.5f); return "Mantén presionado el clic para cortar la red";
         }
-        if (e.etiqueta == "Cofre del tesoro") { color = glm::vec3(1.0f, 0.85f, 0.4f); return cofreAbierto ? "Abierto" : "Cerrado: limpia el fondo para abrirlo"; }
+        if (e.etiqueta == "Cofre del tesoro") {
+            color = glm::vec3(1.0f, 0.85f, 0.4f);
+            return cofreAbierto ? "Abierto: ¡te hiciste rico!" : (fase == 2 ? "¡Listo! Acércate o haz clic para abrirlo" : "Cerrado: termina la misión para abrirlo");
+        }
         return "";
     }
 
@@ -290,12 +322,13 @@ public:
         ui.Texto(b, px + 16 * s, yy + 6 * s, 13 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
 
         // ---------------- objetivos (abajo a la izquierda)
-        bool hecho[5] = { limpiezaSinGrandes(), leonesRetirados >= leonesTotal, tortugaLibre, barrilRetirado, cofreAbierto };
-        const char* obj[5] = { "Recoge la basura del fondo", "Retira a los peces león", "Libera a la tortuga de la red", "Retira el barril tóxico", "Abre el cofre del tesoro" };
-        float bw = 300 * s, bh = 150 * s, bx = 18 * s, by = H - bh - 18 * s;
+        char objEsp[64]; snprintf(objEsp, sizeof(objEsp), "Registra las especies (%d/%d · L: lista)", (int)registradas.size(), totalEspecies);
+        bool hecho[6] = { limpiezaSinGrandes(), leonesRetirados >= leonesTotal, tortugaLibre, barrilRetirado, cofreAbierto, (int)registradas.size() >= totalEspecies };
+        const char* obj[6] = { "Recoge la basura del fondo", "Retira a los peces león", "Libera a la tortuga de la red", "Retira el barril tóxico", "Abre el cofre del tesoro", objEsp };
+        float bw = 310 * s, bh = 172 * s, bx = 18 * s, by = H - bh - 18 * s;
         ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14 * s);
         ui.Texto("OBJETIVOS", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        for (int k = 0; k < 5; k++) {
+        for (int k = 0; k < 6; k++) {
             float y = by + 36 * s + k * 22 * s;
             glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
             ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, y - 2 * s, 16 * s, c, 1);
@@ -330,6 +363,18 @@ public:
             for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, y, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); y += lh; }
             for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, y, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); y += lh; }
         }
+        if (verLista) HUDListaEspecies(ui, especiesLista, registradas);
+        char r1[80], r2[80], r3[80];
+        snprintf(r1, sizeof(r1), "Recogiste %d residuos y retiraste el barril tóxico", recogidos[1] + recogidos[2] + recogidos[3]);
+        snprintf(r2, sizeof(r2), "Retiraste %d peces león y liberaste a la tortuga", leonesRetirados);
+        snprintf(r3, sizeof(r3), "Especies registradas en tu bitácora: %d de %d", (int)registradas.size(), totalEspecies);
+        if (fase == 1)
+            HUDZonaCompletada(ui, tFase, "Zona 3 · Naufragios", { r1, r2, r3 },
+                "El fondo quedó limpio. Ve al cofre del tesoro para reclamar tu recompensa.", "¡MISIÓN CUMPLIDA!", ANUNCIO);
+        if (fase == 4)
+            HUDZonaCompletada(ui, tFase, "Encontraste el tesoro del naufragio", { r1, r2, r3 },
+                "El verdadero tesoro es un océano limpio. Cada año entran al mar millones de toneladas de basura: reducir, reutilizar y reciclar evita que llegue aquí.",
+                "¡TE HICISTE RICO!", 14.0f);
         ui.Terminar();
     }
 
@@ -338,11 +383,21 @@ private:
     std::vector<AvisoHUD> avisos;
     int hitos = 0;
     float pesoRecogido = 0.0f, pesoTotal = 0.0f, corte = 0.0f, tiempoLibre = -1.0f;
+    int iCofre = -1, fase = 0; float tFase = 0.0f; bool monedasLanzadas = false;
+    const float ANUNCIO = 9.0f;            // segundos que dura el anuncio de mision cumplida
     int iDron = -1, iRed = -1, iTortuga = -1, iBarril = -1, iNube = -1, iCLata = -1, iCNat = -1, iTapa = -1, iMonedas = -1, iColumna = -1, iSub = -1;
     int objetivo = -1; float distObjetivo = 0.0f; glm::vec3 posObjetivo = glm::vec3(0.0f);
     std::set<std::string> registradas; int totalEspecies = 0;
+    std::vector<std::string> especiesLista; float tCompleto = -1.0f;
     std::string ultimaMira; float tiempoMira = 0.0f;
     bool barrilRetirado = false;
+
+    void AbrirCofre(Escenario& esc, float t)
+    {
+        auto& el = esc.Elementos();
+        fase = 3; tFase = 0.0f; cofreAbierto = true;
+        if (iTapa >= 0) el[iTapa].kfInicio = t;       // la tapa se abre con su animacion por cuadros clave
+    }
 
     bool limpiezaSinGrandes() const
     {

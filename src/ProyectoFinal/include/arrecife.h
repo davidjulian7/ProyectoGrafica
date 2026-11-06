@@ -20,6 +20,7 @@
 #include <zonas.h>
 #include <menu.h>
 #include <fichas.h>
+#include <hud_comun.h>
 
 class MecanicaArrecife
 {
@@ -31,6 +32,8 @@ public:
     int corales = 0, blanqueados = 0, muertos = 0;
     // eventos de sonido (ProyectoFinal los reproduce y los apaga)
     bool sonarAlerta = false, sonarDescubrir = false;
+    bool verLista = false;                 // tecla L: lista de especies de la bitacora
+    bool completado = false;
 
     void Reiniciar(Escenario& esc)
     {
@@ -43,16 +46,20 @@ public:
             if (f && f->bitacora) especies.insert(e.etiqueta);
         }
         totalEspecies = (int)especies.size();
+        especiesLista = OrdenarEspecies(especies);
+        tMax = T_INICIAL; calento = recupero = completado = false; tCompleto = -1.0f; verLista = false;
         Aviso("Arrecife sano a 26.5 °C. Usa las flechas ↑ y ↓ para cambiar la temperatura del agua y observa qué pasa.", glm::vec3(0.55f, 0.9f, 1.0f), 7.0f);
     }
 
     void Tecla(int key, Escenario& esc)
     {
         if (key == GLFW_KEY_R) {
+            if (calento) recupero = true;
             temperatura = T_INICIAL; automatico = false; hitos = 0;
             for (auto& e : esc.Elementos()) { e.estres = e.blanqueo = e.muerte = 0.0f; e.presencia = 1.0f; }
             Aviso("Arrecife restaurado. En la realidad, un arrecife tarda de 10 a 15 años en recuperarse de un blanqueamiento masivo.", glm::vec3(0.5f, 1.0f, 0.6f), 7.0f);
         }
+        else if (key == GLFW_KEY_L) verLista = !verLista;
         else if (key == GLFW_KEY_T) {
             automatico = !automatico;
             if (automatico) Aviso("Simulación de calentamiento: la temperatura sube poco a poco, como en una ola de calor marina.", glm::vec3(1.0f, 0.75f, 0.4f), 6.0f);
@@ -102,6 +109,15 @@ public:
         esc.cfg.densidad = esc.cfgBase.densidad + 0.012f * fMuerte;
         esc.cfg.solColor = esc.cfgBase.solColor * glm::mix(glm::vec3(1.0f), glm::vec3(1.10f, 1.0f, 0.86f), calor);
         esc.cfg.causticas = esc.cfgBase.causticas * (1.0f + 0.3f * calor);
+
+        // --- objetivos de la zona
+        if (temperatura > tMax) tMax = temperatura;
+        if (hitos & 2) calento = true;                                       // provoco un blanqueamiento masivo
+        if (calento && temperatura < T_RECUPERA) recupero = true;            // y despues enfrio el agua
+        if (completado) tCompleto += dt;
+        if (!completado && calento && recupero && (int)registradas.size() >= totalEspecies) {
+            completado = true; tCompleto = 0.0f; sonarDescubrir = true;
+        }
 
         // --- avisos educativos
         if (!(hitos & 1) && temperatura >= T_UMBRAL) {
@@ -195,7 +211,7 @@ public:
                  automatico ? glm::vec4(1.0f, 0.75f, 0.4f, 1.0f) : glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
 
         // ---------------- estado del arrecife (abajo a la izquierda)
-        float bw = 310.0f * s, bh = 136.0f * s, bx = 18.0f * s, by = H - bh - 18.0f * s;
+        float bw = 330.0f * s, bh = 222.0f * s, bx = 18.0f * s, by = H - bh - 18.0f * s;
         ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
         ui.Texto("SALUD DEL ARRECIFE", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
         glm::vec3 cSalud = salud > 0.66f ? glm::vec3(0.4f, 0.95f, 0.55f) : (salud > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
@@ -208,8 +224,16 @@ public:
         ui.Texto(b, bx + 16 * s, by + 60 * s, 14 * s, glm::vec4(0.95f, 0.95f, 0.95f, 1.0f), 0, false);
         snprintf(b, sizeof(b), "Corales muertos: %d", muertos);
         ui.Texto(b, bx + 16 * s, by + 82 * s, 14 * s, glm::vec4(muertos ? glm::vec3(1.0f, 0.6f, 0.55f) : glm::vec3(0.95f), 1.0f), 0, false);
-        snprintf(b, sizeof(b), "Especies registradas: %d de %d", (int)registradas.size(), totalEspecies);
+        snprintf(b, sizeof(b), "Especies registradas: %d de %d  (L: lista)", (int)registradas.size(), totalEspecies);
         ui.Texto(b, bx + 16 * s, by + 104 * s, 14 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
+        ui.Texto("OBJETIVOS", bx + 16 * s, by + 132 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+        bool hecho[3] = { calento, recupero, (int)registradas.size() >= totalEspecies };
+        const char* obj[3] = { "Sube la temperatura hasta blanquear el arrecife", "Enfría el agua (↓) o restaura (R)", "Registra todas las especies" };
+        for (int k = 0; k < 3; k++) {
+            glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
+            ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, by + 152 * s + k * 22 * s, 16 * s, c, 1);
+            ui.Texto(obj[k], bx + 36 * s, by + 154 * s + k * 22 * s, 13 * s, c, 0, false);
+        }
 
         // ---------------- avisos (arriba al centro)
         float ay = 92.0f * s;
@@ -241,6 +265,15 @@ public:
             for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); yy += lh; }
             for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); yy += lh; }
         }
+        if (verLista) HUDListaEspecies(ui, especiesLista, registradas);
+        if (completado) {
+            char r1[64], r2[64], r3[64];
+            snprintf(r1, sizeof(r1), "Blanqueaste el arrecife (máximo: %.1f °C)", tMax);
+            snprintf(r2, sizeof(r2), "Enfriaste el agua: %d corales murieron en el proceso", muertos);
+            snprintf(r3, sizeof(r3), "Registraste las %d especies del arrecife", totalEspecies);
+            HUDZonaCompletada(ui, tCompleto, "Zona 1 · Arrecifes", { r1, r2, r3 },
+                "Con 1.5 °C de calentamiento global se perdería entre el 70% y el 90% de los arrecifes de coral del planeta (IPCC, 2018).");
+        }
         ui.Terminar();
     }
 
@@ -250,6 +283,9 @@ private:
     int hitos = 0;
     std::set<std::string> registradas;
     int totalEspecies = 0;
+    std::vector<std::string> especiesLista;
+    float tMax = 26.5f, tCompleto = -1.0f;
+    bool calento = false, recupero = false;
     std::string ultimaMira;
     float tiempoMira = 0.0f;
 

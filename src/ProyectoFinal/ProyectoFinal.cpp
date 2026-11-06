@@ -371,7 +371,7 @@ bool Update() {
 	// Cámara activa: FP del buzo u órbita que lo persigue por detrás
 	const Camera* camVista = &camera;
 	if (modoOrbita && !inspeccion) {
-		glm::vec3 objetivo = camera.Position + camera.Front * 2.0f;
+		glm::vec3 objetivo = camera.Position + camera.BobOffset;
 		glm::vec3 pos = objetivo - camera.Front * orbitDist + glm::vec3(0.0f, 1.2f, 0.0f);
 		float suelo = escenario.AlturaSuelo(pos.x, pos.z) + 0.5f;
 		if (pos.y < suelo) pos.y = suelo;
@@ -417,7 +417,7 @@ bool Update() {
 
 	// 2) Escena de la zona: agua, terreno, fauna, superficie y burbujas
 	//    camVista gobierna la vista; la linterna sigue atada al buzo (camera FP)
-	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera);
+	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera, (modoOrbita || modoOrtogonal) && !inspeccion);
 	if (inspeccion) escenario.DibujarInspeccion(projection, view, camera, animTime);
 
 	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
@@ -505,7 +505,7 @@ void processInput(GLFWwindow* window)
 		camera.Position += diverVelocity * deltaTime;
 
 		// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
-		float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.0f;
+		float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.7f;
 		if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
 		float techo = escenario.cfg.superficieY - 0.6f;
 		if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }

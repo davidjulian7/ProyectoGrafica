@@ -176,6 +176,7 @@ public:
             if (e.basura) basuraTotal++;
         }
         burbujaModelo = Cargar("burbuja", "comun");
+        if (!buzoModelo) buzoModelo = new Model("models/buzo.fbx");
         cfgBase = cfg;
         for (auto& f : fuentes) f.y += AlturaSuelo(f.x, f.z);   // las fuentes se miden desde el fondo
         linterna = cfg.linterna;
@@ -453,7 +454,7 @@ public:
         }
     }
 
-    void Dibujar(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, int fbW, int fbH, const Camera* camBuzo = nullptr)
+    void Dibujar(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, int fbW, int fbH, const Camera* camBuzo = nullptr, bool mostrarBuzo = false)
     {
         glClearColor(cfg.niebla.r, cfg.niebla.g, cfg.niebla.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -491,6 +492,23 @@ public:
             if (!e.visible || e.alpha < 1.0f) continue;
             if (InspeccionActiva() && (int)i == inspeccionIdx) continue;
             DibujarElemento(e, (int)i, t);
+        }
+
+        // El jugador comparte la pose de la camara de primera persona en todas las zonas.
+        // Se oculta desde sus ojos para evitar que la mascara tape la vista.
+        if (mostrarBuzo && camBuzo && buzoModelo) {
+            Comunes(glm::vec3(1.0f), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+            glm::mat4 pose(1.0f);
+            pose[0] = glm::vec4(camBuzo->Right, 0.0f);
+            pose[1] = glm::vec4(camBuzo->Up, 0.0f);
+            pose[2] = glm::vec4(-camBuzo->Front, 0.0f);
+            pose[3] = glm::vec4(camBuzo->Position + camBuzo->BobOffset, 1.0f);
+            // Modelo original: Z arriba, cara hacia -Y; la mascara queda en el origen del jugador.
+            pose = glm::rotate(pose, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            pose = glm::rotate(pose, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            pose = glm::translate(pose, glm::vec3(0.0f, 0.25f, -0.72f));
+            sh->setMat4("model", pose);
+            buzoModelo->Draw(*sh);
         }
 
         // monedas voladoras: oro metalico con destellos
@@ -592,6 +610,7 @@ private:
     std::string terrenoArchivo, terrenoCarpeta;
     Model* terreno = nullptr;
     Model* burbujaModelo = nullptr;
+    Model* buzoModelo = nullptr;
     std::vector<float> alturas;
     int inspeccionIdx = -1;
     float giroInspeccion = 0.0f, inclinacionInspeccion = 0.0f, zoomInspeccion = 1.0f;

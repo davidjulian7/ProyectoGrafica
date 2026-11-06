@@ -195,6 +195,7 @@ public:
             if (SueloHielo(e.pos.x, e.pos.z, 200.0f, 0.0f, y)) e.pos.y = y + e.pieY;
             else e.pos.y += e.pieY;
         }
+        if (z == 1) AjustarArrecife();
         burbujaModelo = Cargar("burbuja", "comun");
         if (!buzoModelo) buzoModelo = new Model("models/buzo.fbx");
         cfgBase = cfg;
@@ -1022,6 +1023,60 @@ private:
             e.fase = Aleatorio(semilla + 4, i) * 6.28f;
             if (!tintes.empty()) e.tinte = tintes[i % tintes.size()];
             elementos.push_back(e);
+        }
+    }
+
+    // Ajustes exclusivos del arrecife, basados en las dimensiones de cada malla.
+    void AjustarArrecife()
+    {
+        for (auto& e : elementos) {
+            float largo = 0.0f;
+            if (e.archivo == "CaballitoMar") largo = 0.20f;
+            else if (e.archivo == "PezPayaso") largo = 0.12f;
+            else if (e.archivo == "Pezcirujano") largo = 0.30f;
+            else if (e.archivo == "PezGlobo") largo = 0.45f;
+            else if (e.archivo == "langosta") largo = 0.50f;
+            else if (e.archivo == "PepinoMar") largo = 0.35f;
+            else if (e.archivo == "EstrellaCorona") largo = 0.45f;
+            else if (e.archivo == "manati") largo = 3.0f;
+            else if (e.archivo == "delfin") largo = 2.8f;
+            else if (e.archivo == "barracuda") largo = 1.4f;
+            else if (e.archivo == "vacamarina") largo = 1.5f;
+            else if (e.archivo == "mantaraya") largo = 4.0f;
+            if (largo == 0.0f || e.modelo->meshes.empty()) continue;
+            glm::vec3 minimo(1e30f), maximo(-1e30f);
+            for (auto& m : e.modelo->meshes) for (auto& v : m.vertices) {
+                minimo = glm::min(minimo, v.Position);
+                maximo = glm::max(maximo, v.Position);
+            }
+            glm::vec3 dim = maximo - minimo;
+            float mayor = glm::max(dim.x, glm::max(dim.y, dim.z));
+            if (mayor > 0.001f) e.escala = largo / mayor;
+        }
+        // Separar colonias entre si y de los objetos fijos del fondo.
+        for (size_t i = 0; i < elementos.size(); ++i) {
+            Elemento& e = elementos[i];
+            bool colonia = e.archivo.find("coral_") == 0 || e.archivo == "esponja_tubo";
+            if (!colonia) continue;
+            glm::vec3 original = e.pos;
+            for (int intento = 0; intento < 500; ++intento) {
+                if (intento) {
+                    float angulo = intento * 2.399963f;
+                    float distancia = 0.45f * sqrtf((float)intento);
+                    e.pos.x = original.x + cosf(angulo) * distancia;
+                    e.pos.z = original.z + sinf(angulo) * distancia;
+                }
+                bool libre = true;
+                for (size_t j = 0; j < elementos.size(); ++j) {
+                    const Elemento& otro = elementos[j];
+                    bool otraColonia = otro.archivo.find("coral_") == 0 || otro.archivo == "esponja_tubo";
+                    if (j == i || (otraColonia && j > i) || otro.mov != MOV_FIJO || otro.archivo == "pasto_marino") continue;
+                    float distancia = glm::length(glm::vec2(e.pos.x - otro.pos.x, e.pos.z - otro.pos.z));
+                    if (distancia < e.radioBase * e.escala + otro.radioBase * otro.escala + 0.15f) { libre = false; break; }
+                }
+                if (libre) break;
+            }
+            e.baseY = e.sobreSuelo ? AlturaSuelo(e.pos.x, e.pos.z) : 0.0f;
         }
     }
 

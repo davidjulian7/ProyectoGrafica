@@ -104,6 +104,9 @@ bool  modoOrbita = false;
 float orbitDist  = 6.0f;                 // rango 3..20 (scroll)
 Camera cameraOrbita(glm::vec3(0.0f, 3.0f, 18.0f));
 
+//Variable para cambiar entre cámara perspectiva y ortogonal (tecla 5)
+bool modoOrtogonal = false;
+
 // Controladores para el movimiento del mouse
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -385,8 +388,29 @@ bool Update() {
 	if (fbW == 0 || fbH == 0) { glfwPollEvents(); return true; }   // ventana minimizada
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, fbW, fbH);
-	glm::mat4 projection = glm::perspective(glm::radians(camVista->Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
-	glm::mat4 view = camVista->GetViewMatrix();
+	glm::mat4 projection;
+	glm::mat4 view;
+
+	if (modoOrtogonal) {
+		// El tamaño cubre el radio de 42.0f del nado del buzo
+		float orthoSize = 20.0f;
+		float aspect = (float)fbW / (float)fbH;
+
+		// Proyección ortogonal (sin punto de fuga)
+		projection = glm::ortho(-orthoSize * aspect, orthoSize * aspect, -orthoSize, orthoSize, 0.1f, 200.0f);
+
+		// Matriz de vista: Posición alta (Y=80), mirando al centro (0,0,0), con el "Arriba" hacia -Z
+		view = glm::lookAt(
+			glm::vec3(0.0f, 3.0f, 10.0f),  // DESDE: 2 unidades arriba, 10 hacia atrás
+			glm::vec3(0.0f, 0.0f, 0.0f),    // HACIA: El centro del mapa (0,0,0)
+			glm::vec3(0.0f, 1.0f, 0.0f)     // ARRIBA: El eje Y estándar
+		);
+	}
+	else {
+		// Proyección de perspectiva normal y cámara del buzo
+		projection = glm::perspective(glm::radians(camVista->Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
+		view = camVista->GetViewMatrix();
+	}
 
 	// 1) Picking: qué hay en el centro de la pantalla (la mira del buzo)
 	escenario.Picking(projection, view, animTime, fbW, fbH);
@@ -461,6 +485,7 @@ void processInput(GLFWwindow* window)
 			if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) ed->rotExtra.z -= velRot;
 			// Objeto sobre el suelo: la altura se mide desde el terreno en la nueva (x,z)
 			if (ed->sobreSuelo) ed->baseY = escenario.AlturaSuelo(ed->pos.x, ed->pos.z);
+
 		}
 	}
 	else {
@@ -518,6 +543,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 		firstMouse = true;
 		return;
 	}
+
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		if (estadoActual == NAUFRAGIOS && !escenario.modoEdicion)
 			naufragio.Clic(escenario.seleccion, escenario, animTime);   // recoger, retirar invasor, cofre
@@ -538,6 +564,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 			std::cout << ">> Pez #" << (pickedFish + 1) << " activo. Es más grande ahora." << std::endl;
 		}
 	}
+
 }
 
 // ---------------------------------------------------------------------------
@@ -580,6 +607,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 	lastY = (float)ypos;
 
 	camera.ProcessMouseMovement(xoffset, yoffset);
+
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
@@ -636,6 +664,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		std::cout << (modoOrbita
 			? ">> Camara en orbita (rueda: distancia, V: volver a 1a persona)"
 			: ">> Camara en 1a persona") << std::endl;
+	}
+	// Cambiar entre cámara perspectiva y ortogonal (tecla 5)
+	else if (key == GLFW_KEY_5) {
+		modoOrtogonal = !modoOrtogonal;
+		std::cout << (modoOrtogonal
+			? ">> Vista Ortogonal activada (Mapa completo)"
+			: ">> Vista Ortogonal desactivada (Volviendo al buzo)") << std::endl;
 	}
 	// --- Modo edición de objetos (A3) ---
 	else if (key == GLFW_KEY_E) {

@@ -888,6 +888,30 @@ private:
         pezLoro.ondula = 0.05f; pezLoro.velNado = 4.0f; pezLoro.fase = 1.5f;
         elementos.push_back(pezLoro);
 
+        // Estrella de corona de espinas (cerca de los parches de coral pero sin chocar)
+        Elemento corona1 = Fijo("EstrellaCorona", c, glm::vec3(0.0f, 0.00f, 0.0f), 45, 1.0f);
+        corona1.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta la estrella horizontalmente
+        corona1.interactivo = true;
+        corona1.etiqueta = "Estrella corona de espinas";
+        elementos.push_back(corona1);
+
+        Elemento corona2 = Fijo("EstrellaCorona", c, glm::vec3(-2.5f, 0.05f, 6.5f), 120, 0.9f);
+        corona2.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta la estrella horizontalmente
+        corona2.interactivo = true;
+        corona2.etiqueta = "Estrella corona de espinas";
+        elementos.push_back(corona2);
+
+        // Pepino de mar (en zonas más arenosas / cerca del pasto marino)
+        Elemento pepino1 = Fijo("PepinoMar", c, glm::vec3(-12.0f, 0.0f, 8.5f), 75, 1.0f);
+        pepino1.interactivo = true;
+        pepino1.etiqueta = "Pepino de mar";
+        elementos.push_back(pepino1);
+
+        Elemento pepino2 = Fijo("PepinoMar", c, glm::vec3(3.0f, 0.0f, 10.0f), 210, 1.1f);
+        pepino2.interactivo = true;
+        pepino2.etiqueta = "Pepino de mar";
+        elementos.push_back(pepino2);
+
         // 17 Pradera de pasto marino con 08 manati y 03 caballitos de mar
         Elemento pasto = Fijo("pasto_marino", c, glm::vec3(0.0f, -0.05f, 0.0f), 0, 1);
         pasto.mecer = 1.6f; pasto.interactivo = true; pasto.etiqueta = "Pasto marino";

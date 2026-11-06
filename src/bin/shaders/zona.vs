@@ -22,6 +22,7 @@ uniform float uMecer;     // vaiven de algas y abanicos
 uniform float uFase;
 uniform int   uOndulaEje;  // 0 = cola de lado a lado (peces), 1 = de arriba a abajo (mamiferos)
 uniform int   uSkinning;   // 1 = aplicar huesos de la armadura
+uniform int   uBoneGroups; // grupos de cuatro influencias usados por este modelo
 uniform mat4  gBones[50];
 
 out vec3 vPosMundo;
@@ -37,14 +38,18 @@ void main()
         huesos += gBones[int(bIDs1[1])] * bWeights1[1];
         huesos += gBones[int(bIDs1[2])] * bWeights1[2];
         huesos += gBones[int(bIDs1[3])] * bWeights1[3];
-        huesos += gBones[int(bIDs2[0])] * bWeights2[0];
-        huesos += gBones[int(bIDs2[1])] * bWeights2[1];
-        huesos += gBones[int(bIDs2[2])] * bWeights2[2];
-        huesos += gBones[int(bIDs2[3])] * bWeights2[3];
-        huesos += gBones[int(bIDs3[0])] * bWeights3[0];
-        huesos += gBones[int(bIDs3[1])] * bWeights3[1];
-        huesos += gBones[int(bIDs3[2])] * bWeights3[2];
-        huesos += gBones[int(bIDs3[3])] * bWeights3[3];
+        if (uBoneGroups > 1) {
+            huesos += gBones[int(bIDs2[0])] * bWeights2[0];
+            huesos += gBones[int(bIDs2[1])] * bWeights2[1];
+            huesos += gBones[int(bIDs2[2])] * bWeights2[2];
+            huesos += gBones[int(bIDs2[3])] * bWeights2[3];
+        }
+        if (uBoneGroups > 2) {
+            huesos += gBones[int(bIDs3[0])] * bWeights3[0];
+            huesos += gBones[int(bIDs3[1])] * bWeights3[1];
+            huesos += gBones[int(bIDs3[2])] * bWeights3[2];
+            huesos += gBones[int(bIDs3[3])] * bWeights3[3];
+        }
         float peso = dot(bWeights1, vec4(1.0)) + dot(bWeights2, vec4(1.0)) + dot(bWeights3, vec4(1.0));
         if (peso > 0.0001) {
             huesos *= 1.0 / peso;

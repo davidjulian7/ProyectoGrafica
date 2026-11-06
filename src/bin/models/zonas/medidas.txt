@@ -45,3 +45,4 @@ naufragios columna_rota 1.250 3.342 1.250
 naufragios bloque 1.672 0.871 1.076
 naufragios roca_naufragio 2.852 1.869 2.991
 comun burbuja 0.951 1.000 1.000
+arrecifes PezLoro 0.700 0.104 0.244

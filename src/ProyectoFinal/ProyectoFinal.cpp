@@ -104,6 +104,9 @@ bool  modoOrbita = false;
 float orbitDist  = 6.0f;                 // rango 3..20 (scroll)
 Camera cameraOrbita(glm::vec3(0.0f, 3.0f, 18.0f));
 
+//Variable para cambiar entre cámara perspectiva y ortogonal (tecla 5)
+bool modoOrtogonal = false;
+
 // Controladores para el movimiento del mouse
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -167,6 +170,7 @@ int pickedFish = -1; // índice del pez seleccionado, -1 = ninguno
 ISoundEngine* SoundEngine = createIrrKlangDevice();
 ISound* sonidoAmbiente = nullptr;   // ambiente en bucle de la zona actual
 bool silencio = false;
+bool ambienteInspeccionPausado = false;
 
 // Cambia el sonido ambiente (nullptr = detener)
 void Ambiente(const char* archivo, float volumen)
@@ -328,15 +332,21 @@ bool Update() {
 	float currentFrame = (float)glfwGetTime();
 	deltaTime = currentFrame - lastFrame;
 	lastFrame = currentFrame;
-	animTime += deltaTime;
-	zonaTiempo += deltaTime;
+	bool inspeccion = estadoActual == ARRECIFES && escenario.InspeccionActiva();
+	if (sonidoAmbiente && ambienteInspeccionPausado != inspeccion) {
+		sonidoAmbiente->setIsPaused(inspeccion);
+		ambienteInspeccionPausado = inspeccion;
+	}
+	float dtEscena = inspeccion ? 0.0f : deltaTime;
+	animTime += dtEscena;
+	zonaTiempo += dtEscena;
 
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
-	processInput(window);
-	if (escenario.Actualizar(deltaTime, animTime, camera))
+	if (!inspeccion) processInput(window);
+	if (escenario.Actualizar(dtEscena, animTime, camera))
 		Efecto("sound/burbujas.wav", 0.35f);          // exhalación del buzo
 	if (estadoActual == ARRECIFES) {
-		arrecife.Actualizar(deltaTime, window, escenario, escenario.Seleccionado());
+		arrecife.Actualizar(dtEscena, window, escenario, escenario.Seleccionado());
 		if (arrecife.sonarAlerta) { Efecto("sound/alerta.wav", 0.6f); arrecife.sonarAlerta = false; }
 		if (arrecife.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); arrecife.sonarDescubrir = false; }
 	}
@@ -360,8 +370,8 @@ bool Update() {
 
 	// Cámara activa: FP del buzo u órbita que lo persigue por detrás
 	const Camera* camVista = &camera;
-	if (modoOrbita) {
-		glm::vec3 objetivo = camera.Position + camera.Front * 2.0f;
+	if (modoOrbita && !inspeccion) {
+		glm::vec3 objetivo = camera.Position + camera.BobOffset;
 		glm::vec3 pos = objetivo - camera.Front * orbitDist + glm::vec3(0.0f, 1.2f, 0.0f);
 		float suelo = escenario.AlturaSuelo(pos.x, pos.z) + 0.5f;
 		if (pos.y < suelo) pos.y = suelo;
@@ -378,15 +388,37 @@ bool Update() {
 	if (fbW == 0 || fbH == 0) { glfwPollEvents(); return true; }   // ventana minimizada
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, fbW, fbH);
-	glm::mat4 projection = glm::perspective(glm::radians(camVista->Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
-	glm::mat4 view = camVista->GetViewMatrix();
+	glm::mat4 projection;
+	glm::mat4 view;
+
+	if (modoOrtogonal) {
+		// El tamaño cubre el radio de 42.0f del nado del buzo
+		float orthoSize = 20.0f;
+		float aspect = (float)fbW / (float)fbH;
+
+		// Proyección ortogonal (sin punto de fuga)
+		projection = glm::ortho(-orthoSize * aspect, orthoSize * aspect, -orthoSize, orthoSize, 0.1f, 200.0f);
+
+		// Matriz de vista: Posición alta (Y=80), mirando al centro (0,0,0), con el "Arriba" hacia -Z
+		view = glm::lookAt(
+			glm::vec3(0.0f, 3.0f, 10.0f),  // DESDE: 2 unidades arriba, 10 hacia atrás
+			glm::vec3(0.0f, 0.0f, 0.0f),    // HACIA: El centro del mapa (0,0,0)
+			glm::vec3(0.0f, 1.0f, 0.0f)     // ARRIBA: El eje Y estándar
+		);
+	}
+	else {
+		// Proyección de perspectiva normal y cámara del buzo
+		projection = glm::perspective(glm::radians(camVista->Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
+		view = camVista->GetViewMatrix();
+	}
 
 	// 1) Picking: qué hay en el centro de la pantalla (la mira del buzo)
 	escenario.Picking(projection, view, animTime, fbW, fbH);
 
 	// 2) Escena de la zona: agua, terreno, fauna, superficie y burbujas
 	//    camVista gobierna la vista; la linterna sigue atada al buzo (camera FP)
-	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera);
+	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera, (modoOrbita || modoOrtogonal) && !inspeccion);
+	if (inspeccion) escenario.DibujarInspeccion(projection, view, camera, animTime);
 
 	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
 	const Elemento* sel = escenario.Seleccionado();
@@ -395,11 +427,15 @@ bool Update() {
 		: estadoActual == ARRECIFES ? arrecife.Detalle(*sel, colorDetalle)
 		: estadoActual == AGUAS_FRIAS ? aguasFrias.Detalle(*sel, colorDetalle)
 		: estadoActual == NAUFRAGIOS ? naufragio.Detalle(*sel, colorDetalle) : std::string();
-	menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
+	if (!inspeccion) menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
 	if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 	if (estadoActual == AGUAS_FRIAS) aguasFrias.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 	if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
+	if (inspeccion) {
+		const Elemento* observado = escenario.ElementoInspeccionado();
+		if (observado) menuInicio.DrawInspeccion(window, observado->etiqueta, observado->archivo, detalle, colorDetalle);
+	}
 	zonaFade = zonaFade - deltaTime * 1.4f;
 	if (zonaFade < 0.0f) zonaFade = 0.0f;
 
@@ -449,35 +485,86 @@ void processInput(GLFWwindow* window)
 			if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS) ed->rotExtra.z -= velRot;
 			// Objeto sobre el suelo: la altura se mide desde el terreno en la nueva (x,z)
 			if (ed->sobreSuelo) ed->baseY = escenario.AlturaSuelo(ed->pos.x, ed->pos.z);
+
 		}
 	}
 	else {
+		static bool caminando = false;      // Aguas Frias: el buzo esta de pie sobre el hielo
+		static float velCaida = 0.0f;
+		bool frias = estadoActual == AGUAS_FRIAS;
+		float supY = escenario.cfg.superficieY;
 		glm::vec3 wish(0.0f);
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) wish += camera.Front;
 		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) wish -= camera.Front;
 		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) wish -= camera.Right;
 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) wish += camera.Right;
-		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) wish.y += 1.0f;          // subir
+		bool saltar = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+		if (saltar) wish.y += 1.0f;          // subir
 		if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
 		    glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) wish.y -= 1.0f;                // bajar
-		if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
 		float aleteo = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 2.0f : 1.0f;
+		if (!frias) caminando = false;
 
-		diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
-		diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
-		camera.Position += diverVelocity * deltaTime;
+		// salir del agua: si hay hielo justo a la altura de los ojos, el buzo se sube
+		if (frias && !caminando) {
+			float gy;
+			if (camera.Position.y > supY - 1.2f && escenario.HieloBajo(camera.Position.x, camera.Position.z, camera.Position.y + 1.3f, animTime, gy) && gy > supY + 0.2f) {
+				caminando = true; velCaida = 0.0f; diverVelocity = glm::vec3(0.0f);
+			}
+		}
 
-		// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
-		float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.0f;
-		if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
-		float techo = escenario.cfg.superficieY - 0.6f;
-		if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
+		if (caminando) {
+			glm::vec3 fwd(camera.Front.x, 0.0f, camera.Front.z), rgt(camera.Right.x, 0.0f, camera.Right.z);
+			glm::vec3 mover(0.0f);
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) mover += fwd;
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) mover -= fwd;
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) mover -= rgt;
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) mover += rgt;
+			if (glm::length(mover) > 0.001f) mover = glm::normalize(mover) * (aleteo > 1.0f ? 7.0f : 4.5f);
+			float k = 1.0f - std::exp(-8.0f * deltaTime);
+			diverVelocity.x += (mover.x - diverVelocity.x) * k;
+			diverVelocity.z += (mover.z - diverVelocity.z) * k;
+			float pie = camera.Position.y - 1.7f, alto;
+			float nx = camera.Position.x + diverVelocity.x * deltaTime, nz = camera.Position.z + diverVelocity.z * deltaTime;
+			if (escenario.HieloBajo(nx, nz, pie + 40.0f, animTime, alto) && alto > pie + 1.0f && alto > supY + 0.2f) { diverVelocity.x = diverVelocity.z = 0.0f; }   // pared de hielo
+			else { camera.Position.x = nx; camera.Position.z = nz; }
+			velCaida -= 14.0f * deltaTime;
+			camera.Position.y += velCaida * deltaTime;
+			pie = camera.Position.y - 1.7f;
+			float gy;
+			bool apoyo = false;
+			if (escenario.HieloBajo(camera.Position.x, camera.Position.z, pie + 1.0f, animTime, gy) && pie <= gy + 0.02f && velCaida <= 0.0f) {
+				float meta = gy + 1.7f;
+				camera.Position.y = camera.Position.y + 10.0f * deltaTime < meta ? camera.Position.y + 10.0f * deltaTime : meta;
+				velCaida = 0.0f; apoyo = true;
+			}
+			if (apoyo && saltar) velCaida = 6.5f;
+			if (!apoyo && camera.Position.y < supY + 0.45f) {   // cayo al agua
+				caminando = false;
+				diverVelocity.y = velCaida * 0.35f;
+			}
+			else diverVelocity.y = apoyo ? 0.0f : velCaida;
+		}
+		else {
+			if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
+			diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
+			diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
+			camera.Position += diverVelocity * deltaTime;
+
+			// Límites: no atravesar el fondo, no salir del agua, no salir de la zona
+			float suelo = escenario.AlturaSuelo(camera.Position.x, camera.Position.z) + 1.7f;
+			if (camera.Position.y < suelo) { camera.Position.y = suelo; if (diverVelocity.y < 0.0f) diverVelocity.y = 0.0f; }
+			float techo = frias ? supY + 0.6f : supY - 0.6f;
+			if (camera.Position.y > techo) { camera.Position.y = techo; if (diverVelocity.y > 0.0f) diverVelocity.y = 0.0f; }
+		}
+		escenario.buzoDePie = frias && caminando;
 		glm::vec2 xz(camera.Position.x, camera.Position.z);
 		if (glm::length(xz) > 42.0f) {
 			xz = glm::normalize(xz) * 42.0f;
 			camera.Position.x = xz.x; camera.Position.z = xz.y;
 		}
 	}
+	escenario.buzoVel = diverVelocity;
 
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -500,6 +587,13 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 			menuInicio.OnClick();
 		return;
 	}
+	if (estadoActual == ARRECIFES && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !escenario.modoEdicion) {
+		if (escenario.InspeccionActiva()) escenario.CerrarInspeccion();
+		else escenario.AbrirInspeccion();
+		firstMouse = true;
+		return;
+	}
+
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		if (estadoActual == NAUFRAGIOS && !escenario.modoEdicion)
 			naufragio.Clic(escenario.seleccion, escenario, animTime);   // recoger, retirar invasor, cofre
@@ -520,6 +614,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 			std::cout << ">> Pez #" << (pickedFish + 1) << " activo. Es más grande ahora." << std::endl;
 		}
 	}
+
 }
 
 // ---------------------------------------------------------------------------
@@ -537,6 +632,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		firstMouse = true;
 		return;
 	}
+	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
+		if (firstMouse) {
+			lastX = (float)xpos; lastY = (float)ypos; firstMouse = false;
+			return;
+		}
+		float dx = (float)xpos - lastX, dy = lastY - (float)ypos;
+		lastX = (float)xpos; lastY = (float)ypos;
+		escenario.RotarInspeccion(dx, dy);
+		return;
+	}
 
 	if (firstMouse)
 	{
@@ -552,11 +657,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 	lastY = (float)ypos;
 
 	camera.ProcessMouseMovement(xoffset, yoffset);
+
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	if (estadoActual == MENU) return;
+	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
+		escenario.ZoomInspeccion((float)yoffset);
+		return;
+	}
 	if (modoOrbita) {
 		orbitDist -= (float)yoffset * 0.5f;
 		if (orbitDist < 3.0f) orbitDist = 3.0f;
@@ -586,6 +696,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			menuInicio.OnKey(key);
 		return;
 	}
+	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
+		if (key == GLFW_KEY_ESCAPE) escenario.CerrarInspeccion();
+		return;
+	}
 
 	// Dentro de una zona: Esc regresa al menú de inicio, F enciende/apaga la linterna
 	if (key == GLFW_KEY_ESCAPE)
@@ -600,6 +714,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		std::cout << (modoOrbita
 			? ">> Camara en orbita (rueda: distancia, V: volver a 1a persona)"
 			: ">> Camara en 1a persona") << std::endl;
+	}
+	// Cambiar entre cámara perspectiva y ortogonal (tecla 5)
+	else if (key == GLFW_KEY_5) {
+		modoOrtogonal = !modoOrtogonal;
+		std::cout << (modoOrtogonal
+			? ">> Vista Ortogonal activada (Mapa completo)"
+			: ">> Vista Ortogonal desactivada (Volviendo al buzo)") << std::endl;
 	}
 	// --- Modo edición de objetos (A3) ---
 	else if (key == GLFW_KEY_E) {
@@ -651,6 +772,8 @@ bool UpdateMenu()
 void EntrarZona(int zona)
 {
 	estadoActual = (Estado)zona;
+	escenario.CerrarInspeccion();
+	ambienteInspeccionPausado = false;
 
 	// Carga la zona (la primera vez lee sus modelos) y coloca al buzo en su punto de inicio
 	escenario.Entrar(zona, camera);

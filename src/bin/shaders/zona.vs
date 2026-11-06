@@ -3,6 +3,12 @@
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoords;
+layout (location = 5) in vec4 bIDs1;
+layout (location = 6) in vec4 bIDs2;
+layout (location = 7) in vec4 bIDs3;
+layout (location = 8) in vec4 bWeights1;
+layout (location = 9) in vec4 bWeights2;
+layout (location = 10) in vec4 bWeights3;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -15,6 +21,9 @@ uniform float uVelNado;   // velocidad de la ondulacion
 uniform float uMecer;     // vaiven de algas y abanicos
 uniform float uFase;
 uniform int   uOndulaEje;  // 0 = cola de lado a lado (peces), 1 = de arriba a abajo (mamiferos)
+uniform int   uSkinning;   // 1 = aplicar huesos de la armadura
+uniform int   uBoneGroups; // grupos de cuatro influencias usados por este modelo
+uniform mat4  gBones[50];
 
 out vec3 vPosMundo;
 out vec3 vNormal;
@@ -23,6 +32,31 @@ out vec2 vUV;
 void main()
 {
     vec3 p = aPos;
+    vec3 normal = aNormal;
+    if (uSkinning != 0) {
+        mat4 huesos = gBones[int(bIDs1[0])] * bWeights1[0];
+        huesos += gBones[int(bIDs1[1])] * bWeights1[1];
+        huesos += gBones[int(bIDs1[2])] * bWeights1[2];
+        huesos += gBones[int(bIDs1[3])] * bWeights1[3];
+        if (uBoneGroups > 1) {
+            huesos += gBones[int(bIDs2[0])] * bWeights2[0];
+            huesos += gBones[int(bIDs2[1])] * bWeights2[1];
+            huesos += gBones[int(bIDs2[2])] * bWeights2[2];
+            huesos += gBones[int(bIDs2[3])] * bWeights2[3];
+        }
+        if (uBoneGroups > 2) {
+            huesos += gBones[int(bIDs3[0])] * bWeights3[0];
+            huesos += gBones[int(bIDs3[1])] * bWeights3[1];
+            huesos += gBones[int(bIDs3[2])] * bWeights3[2];
+            huesos += gBones[int(bIDs3[3])] * bWeights3[3];
+        }
+        float peso = dot(bWeights1, vec4(1.0)) + dot(bWeights2, vec4(1.0)) + dot(bWeights3, vec4(1.0));
+        if (peso > 0.0001) {
+            huesos *= 1.0 / peso;
+            p = (huesos * vec4(aPos, 1.0)).xyz;
+            normal = mat3(huesos) * aNormal;
+        }
+    }
     if (uOndula > 0.0) {
         // 0 en la cabeza, 1 en la cola: la cola se mueve mas que la cabeza
         float t = clamp((uLargo - p.x) / (2.0 * uLargo), 0.0, 1.0);
@@ -37,7 +71,7 @@ void main()
     }
     vec4 mundo = model * vec4(p, 1.0);
     vPosMundo = mundo.xyz;
-    vNormal = mat3(transpose(inverse(model))) * aNormal;
+    vNormal = normalize(mat3(transpose(inverse(model))) * normal);
     vUV = aTexCoords;
     gl_Position = projection * view * mundo;
 }

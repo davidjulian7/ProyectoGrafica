@@ -41,7 +41,10 @@ enum TipoMov {
     MOV_CARDUMEN,   // grupo de 'miembros' que nadan juntos en circulo
     MOV_LIBRE,      // recorrido en forma de 8 (animales grandes)
     MOV_DERIVA,     // flota a la deriva girando lentamente (basura)
-    MOV_KF          // animacion por cuadros clave (Elemento::kf)
+    MOV_KF,         // animacion por cuadros clave (Elemento::kf)
+    MOV_ZAMBULLIDA, // vive sobre el hielo: descansa, salta al agua, nada en un lazo y vuelve a subir
+    MOV_RUTA,       // recorrido amplio y suave que no se repite (ballena)
+    MOV_BARCO       // cruza la zona en linea recta y vuelve a empezar (rompehielos)
 };
 
 struct Elemento {
@@ -86,6 +89,12 @@ struct Elemento {
     bool pulsar = false;               // medusa: la campana se contrae y se expande
     float fantasma = 0.0f;             // brillo de borde tipo Fresnel (traslucidos)
     float kfInicio = 0.0f;             // MOV_KF: segundo en que empieza la animacion
+    float rumbo = 0.0f, alcance = 5.0f, periodo = 24.0f, profundidad = 3.0f, nivelAgua = 0.0f;   // MOV_ZAMBULLIDA
+    glm::vec3 rotNado = glm::vec3(0.0f);   // giro extra mientras nada (en reposo se usa rotExtra)
+    bool caminable = false;            // el buzo puede pararse encima (hielo)
+    bool sobreHielo = false;           // al cargar se apoya en el hielo que tiene debajo
+    float pieY = 0.0f;                 // distancia del origen a la base del modelo
+    float reloj = 0.0f;                // MOV_BARCO: tiempo propio (se puede detener)
     // calculado al cargar
     Model* modelo = nullptr;
     unsigned int id = 0;
@@ -175,7 +184,19 @@ public:
             e.baseY = e.sobreSuelo ? AlturaSuelo(e.pos.x, e.pos.z) : 0.0f;
             if (e.basura) basuraTotal++;
         }
+        for (auto& e : elementos) {
+            float mn = 0.0f;
+            for (auto& me : e.modelo->meshes) for (auto& v : me.vertices) mn = v.Position.y < mn ? v.Position.y : mn;
+            e.pieY = -mn * e.escala;
+        }
+        for (auto& e : elementos) {
+            if (!e.sobreHielo) continue;
+            float y;
+            if (SueloHielo(e.pos.x, e.pos.z, 200.0f, 0.0f, y)) e.pos.y = y + e.pieY;
+            else e.pos.y += e.pieY;
+        }
         burbujaModelo = Cargar("burbuja", "comun");
+        if (!buzoModelo) buzoModelo = new Model("models/buzo.fbx");
         cfgBase = cfg;
         for (auto& f : fuentes) f.y += AlturaSuelo(f.x, f.z);   // las fuentes se miden desde el fondo
         linterna = cfg.linterna;
@@ -218,6 +239,7 @@ public:
 
     // Posicion actual (centro del primer miembro) de un elemento
     glm::vec3 Posicion(int i, float t) const { return glm::vec3(Matriz(elementos[i], i, 0, t)[3]); }
+    bool HieloBajo(float x, float z, float maxY, float t, float& y) const { return SueloHielo(x, z, maxY, t, y); }
 
     // Guarda una animacion por cuadros clave propia de la zona (direccion estable)
     const AnimacionKF* GuardarKF(const AnimacionKF& a) { animaciones.push_back(a); return &animaciones.back(); }
@@ -226,6 +248,7 @@ public:
     bool Actualizar(float dt, float t, const Camera& cam)
     {
         if (dt > 0.1f) dt = 0.1f;
+        tiempoJuego = t;
         bool exhalo = false;
         for (MonedaVoladora& m : monedasVuelo) {
             if (m.quieta) continue;
@@ -286,6 +309,7 @@ public:
     //  - asistencia de punteria: si el centro no toca nada, se toma el objeto mas cercano al centro
     void Picking(const glm::mat4& proj, const glm::mat4& view, float t, int fbW, int fbH)
     {
+        if (InspeccionActiva()) return;
         glm::mat4 inv = glm::inverse(view);
         glm::vec3 o = glm::vec3(inv[3]), d = -glm::normalize(glm::vec3(inv[2]));
         int R = (int)(16.0f * fbH / 768.0f); if (R < 5) R = 5;
@@ -307,7 +331,7 @@ public:
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
             if (!e.visible || e.alpha < 0.35f && !e.interactivo) continue;
-            unsigned int id = e.interactivo ? e.id : 0xFFFFFF;
+            unsigned int id = (zona == 1 || e.interactivo) ? e.id : 0xFFFFFF;
             bool colorPuesto = false;
             for (int k = 0; k < Visibles(e); k++) {
                 glm::mat4 M = Matriz(e, (int)i, k, t);
@@ -360,6 +384,23 @@ public:
     }
 
     const Elemento* Seleccionado() const { return seleccion >= 0 ? &elementos[seleccion] : nullptr; }
+
+    bool InspeccionActiva() const { return inspeccionIdx >= 0 && inspeccionIdx < (int)elementos.size(); }
+    const Elemento* ElementoInspeccionado() const { return InspeccionActiva() ? &elementos[inspeccionIdx] : nullptr; }
+    void AbrirInspeccion()
+    {
+        if (zona != 1 || seleccion < 0 || seleccion >= (int)elementos.size() || !elementos[seleccion].visible) return;
+        inspeccionIdx = seleccion;
+        giroInspeccion = inclinacionInspeccion = 0.0f;
+        zoomInspeccion = 1.0f;
+    }
+    void CerrarInspeccion() { inspeccionIdx = -1; }
+    void RotarInspeccion(float dx, float dy)
+    {
+        giroInspeccion += dx * 0.45f;
+        inclinacionInspeccion = glm::clamp(inclinacionInspeccion + dy * 0.45f, -75.0f, 75.0f);
+    }
+    void ZoomInspeccion(float delta) { zoomInspeccion = glm::clamp(zoomInspeccion + delta * 0.12f, 0.65f, 1.7f); }
 
     // ------------------------------------------------------------ modo edición (A3)
     bool modoEdicion = false;
@@ -435,8 +476,15 @@ public:
         }
     }
 
-    void Dibujar(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, int fbW, int fbH, const Camera* camBuzo = nullptr)
+    void Dibujar(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, int fbW, int fbH, const Camera* camBuzo = nullptr, bool mostrarBuzo = false)
     {
+        ZonaConfig cfgGuardada = cfg;
+        bool arriba = zona == 2 && cam.Position.y > cfg.superficieY;   // sobre el hielo: aire, cielo y mar
+        if (arriba) {
+            cfg.niebla = glm::vec3(0.66f, 0.80f, 0.90f); cfg.densidad = 0.0045f; cfg.causticas = 0.0f;
+            cfg.ambArriba = glm::vec3(0.62f, 0.70f, 0.80f); cfg.ambAbajo = glm::vec3(0.34f, 0.38f, 0.44f);
+            cfg.solColor = glm::vec3(1.05f, 1.0f, 0.92f);
+        }
         glClearColor(cfg.niebla.r, cfg.niebla.g, cfg.niebla.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         float profundidad = cfg.superficieY - cam.Position.y;
@@ -452,6 +500,7 @@ public:
         shFondo->setVec3("uSolColor", cfg.solColor);
         shFondo->setFloat("uTiempo", t);
         shFondo->setFloat("uProfCam", profundidad);
+        shFondo->setInt("uArriba", arriba ? 1 : 0);
         glBindVertexArray(vaoVacio); glDrawArrays(GL_TRIANGLES, 0, 3); glBindVertexArray(0);
         glDepthMask(GL_TRUE);
 
@@ -471,7 +520,40 @@ public:
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
             if (!e.visible || e.alpha < 1.0f) continue;
+            if (InspeccionActiva() && (int)i == inspeccionIdx) continue;
             DibujarElemento(e, (int)i, t);
+        }
+
+        // El jugador comparte la pose de la camara de primera persona en todas las zonas.
+        // Se oculta desde sus ojos para evitar que la mascara tape la vista.
+        if (mostrarBuzo && camBuzo && buzoModelo) {
+            Comunes(glm::vec3(1.0f), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+            float dtB = t - buzoUltimoT; buzoUltimoT = t;
+            if (dtB < 0.0f || dtB > 0.2f) { dtB = 0.016f; buzoFrente = camBuzo->Front; }
+            // el cuerpo sigue a la mirada con retraso, asi no gira de golpe
+            glm::vec3 objF = camBuzo->Front;
+            if (buzoDePie) { objF.y = 0.0f; objF = glm::length(objF) > 0.01f ? glm::normalize(objF) : buzoFrente; }
+            buzoFrente = glm::normalize(glm::mix(buzoFrente, objF, 1.0f - expf(-5.0f * dtB)));
+            float vel = glm::length(buzoVel);
+            buzoVelSuave += (vel - buzoVelSuave) * (1.0f - expf(-4.0f * dtB));
+            buzoFase += dtB * (1.6f + buzoVelSuave * 0.9f);
+            float mov = buzoVelSuave > 4.0f ? 1.0f : buzoVelSuave * 0.25f;
+            glm::vec3 der = glm::normalize(glm::cross(buzoFrente, glm::vec3(0.0f, 1.0f, 0.0f)));
+            glm::vec3 arr = glm::cross(der, buzoFrente);
+            glm::mat4 pose(1.0f);
+            pose[0] = glm::vec4(der, 0.0f);
+            pose[1] = glm::vec4(arr, 0.0f);
+            pose[2] = glm::vec4(-buzoFrente, 0.0f);
+            pose[3] = glm::vec4(camBuzo->Position + camBuzo->BobOffset + arr * (0.05f * sinf(buzoFase * 2.0f) * (0.4f + mov)), 1.0f);
+            if (!buzoDePie) pose = glm::rotate(pose, -0.85f * mov, glm::vec3(1.0f, 0.0f, 0.0f));   // se inclina hacia adelante al nadar
+            pose = glm::rotate(pose, 0.10f * sinf(buzoFase) * (0.3f + mov), glm::vec3(0.0f, 0.0f, 1.0f));   // balanceo de aleteo
+            pose = glm::rotate(pose, 0.06f * sinf(buzoFase * 2.0f + 1.0f) * mov, glm::vec3(1.0f, 0.0f, 0.0f));
+            // Modelo original: Z arriba, cara hacia -Y; la mascara queda en el origen del jugador.
+            pose = glm::rotate(pose, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            pose = glm::rotate(pose, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            pose = glm::translate(pose, glm::vec3(0.0f, 0.25f, -0.72f));
+            sh->setMat4("model", pose);
+            buzoModelo->Draw(*sh);
         }
 
         // monedas voladoras: oro metalico con destellos
@@ -491,6 +573,7 @@ public:
 
         // 3) Superficie del agua vista desde abajo (Fresnel + ventana de Snell)
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
         shSuperficie->use();
         glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(cam.Position.x, cfg.superficieY, cam.Position.z));
         m = glm::scale(m, glm::vec3(400.0f, 1.0f, 400.0f));
@@ -512,6 +595,7 @@ public:
         glDepthMask(GL_FALSE);
         for (size_t i = 0; i < elementos.size(); i++) {
             Elemento& e = elementos[i];
+            if (InspeccionActiva() && (int)i == inspeccionIdx) continue;
             if (e.visible && e.alpha < 1.0f) DibujarElemento(e, (int)i, t);
         }
         Comunes(glm::vec3(0.85f, 0.95f, 1.0f), 0.0f, 0.0f, 0.0f, 0.0f, 0.45f, 0.35f);
@@ -527,6 +611,37 @@ public:
         }
         glDepthMask(GL_TRUE);
         glDisable(GL_BLEND);
+        cfg = cfgGuardada;
+    }
+
+    // Presenta el modelo seleccionado delante de la camara sin alterar su pose en la escena.
+    void DibujarInspeccion(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t)
+    {
+        if (!InspeccionActiva()) return;
+        Elemento& e = elementos[inspeccionIdx];
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_BLEND);
+        sh->use();
+        ConfigurarShader(proj, view, cam, t, &cam);
+        Comunes(e.tinte, e.ondula, e.medioLargo, e.mecer, e.fase, e.alpha, e.emision);
+        sh->setFloat("uSpecPower", e.specPower);
+        sh->setFloat("uSpecInt", e.specInt);
+        sh->setFloat("uMetalico", e.metalico);
+        sh->setFloat("uBlanqueo", e.blanqueo);
+        sh->setFloat("uMuerte", e.muerte);
+        sh->setInt("uOndulaEje", e.ondulaVertical ? 1 : 0);
+        sh->setFloat("uFantasma", e.fantasma);
+        glm::mat4 pose = Matriz(e, inspeccionIdx, 0, t);
+        glm::mat4 rotacion(1.0f);
+        rotacion = glm::rotate(rotacion, glm::radians(giroInspeccion), cam.Up);
+        rotacion = glm::rotate(rotacion, glm::radians(inclinacionInspeccion), cam.Right);
+        float diametro = 2.0f * e.radioBase * e.escala;
+        float ajuste = 2.2f / (diametro > 0.05f ? diametro : 0.05f);
+        glm::vec3 centro = cam.Position + cam.Front * 3.8f + cam.Up * 0.05f;
+        glm::mat4 modelo = glm::translate(glm::mat4(1.0f), centro) * rotacion
+                         * glm::mat4(glm::mat3(pose)) * glm::scale(glm::mat4(1.0f), glm::vec3(ajuste * zoomInspeccion));
+        sh->setMat4("model", modelo);
+        e.modelo->Draw(*sh, e.modelo->TieneAnimacion() ? t : -1.0f);
     }
 
 private:
@@ -542,12 +657,20 @@ private:
     std::string terrenoArchivo, terrenoCarpeta;
     Model* terreno = nullptr;
     Model* burbujaModelo = nullptr;
+    Model* buzoModelo = nullptr;
     std::vector<float> alturas;
+    int inspeccionIdx = -1;
+    float giroInspeccion = 0.0f, inclinacionInspeccion = 0.0f, zoomInspeccion = 1.0f;
     static const int N = 111;
     float respiracion = 3.0f, fuenteTiempo = 0.0f;
 public:
     float velFauna = 0.5f;             // multiplica la velocidad de nado de toda la fauna (mas lento = mas facil de observar)
+    glm::vec3 buzoVel = glm::vec3(0.0f);   // velocidad del buzo (anima el modelo y el vaiven)
+    bool buzoDePie = false;            // el buzo camina sobre el hielo (cuerpo vertical)
+    float tiempoJuego = 0.0f;          // ultimo tiempo recibido en Actualizar (lo usan las mecanicas y la fisica)
 private:
+    glm::vec3 buzoFrente = glm::vec3(0.0f, 0.0f, -1.0f);   // orientacion suavizada del cuerpo del buzo
+    float buzoFase = 0.0f, buzoUltimoT = 0.0f, buzoVelSuave = 0.0f;
 
     // ------------------------------------------------------------ utilidades
     static float Aleatorio(int a, int b)
@@ -560,6 +683,7 @@ private:
     Model* Cargar(const std::string& archivo, const std::string& carpeta)
     {
         std::string ruta = "models/zonas/" + carpeta + "/" + archivo + ".fbx";
+        if (!std::ifstream(ruta).good()) ruta = "models/zonas/" + carpeta + "/" + archivo + ".glb";
         auto it = cache.find(ruta);
         if (it != cache.end()) return it->second;
         Model* m = new Model(ruta);
@@ -609,16 +733,85 @@ private:
         }
     }
 
+    static float Suavizar(float x) { x = x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); return x * x * (3.0f - 2.0f * x); }
+
+    // Posicion de un miembro con movimiento propio. nado: 0 en tierra, 1 en el agua. dir (si no es cero) fuerza el rumbo.
+    glm::vec3 PosMovil(const Elemento& e, int idx, int k, float t, float& nado, glm::vec3& dir) const
+    {
+        nado = 1.0f; dir = glm::vec3(0.0f);
+        float signo = e.vel >= 0.0f ? 1.0f : -1.0f;
+        glm::vec3 off = k > 0 ? Aleatorio3(idx * 97 + k) * e.dispersion : glm::vec3(0.0f);
+        glm::vec3 p = e.pos;
+        switch (e.mov) {
+        case MOV_ORBITA:
+        case MOV_CARDUMEN: {
+            float a = t * e.vel * velFauna + e.fase - (k > 0 ? (0.15f + 0.25f * Aleatorio(idx, k)) * signo * (float)(k % 7) * 0.3f : 0.0f);
+            float r = e.radio + off.x;
+            p = e.pos + glm::vec3(cosf(a) * r, off.y + sinf(t * e.oscVel + e.fase + k) * e.oscAmp, sinf(a) * r);
+            p.y += e.baseY;
+            break; }
+        case MOV_LIBRE: {
+            float a = t * e.vel * velFauna + e.fase;
+            p = e.pos + glm::vec3(e.radio * sinf(a), sinf(t * e.oscVel + e.fase) * e.oscAmp, e.radio * 0.6f * sinf(2.0f * a)) + off;
+            break; }
+        case MOV_RUTA: {   // curva con frecuencias que no coinciden: casi nunca repite el mismo recorrido
+            float a = t * fabsf(e.vel) * velFauna, R = e.radio;
+            p = e.pos + glm::vec3(R * (0.85f * sinf(a + e.fase) + 0.35f * sinf(0.37f * a + 1.3f)),
+                                  e.oscAmp * (sinf(0.43f * a + 0.5f) + 0.35f * sinf(0.97f * a + 2.0f)),
+                                  R * (0.60f * cosf(0.71f * a + 1.7f * e.fase) + 0.30f * sinf(0.53f * a + 0.4f))) + off;
+            break; }
+        case MOV_BARCO: {
+            float x = -110.0f + fmodf(e.reloj * e.vel, 220.0f);
+            p = glm::vec3(x, e.pos.y + 0.12f * sinf(t * 0.8f + e.fase), e.pos.z);
+            dir = glm::vec3(1.0f, 0.0f, 0.0f);
+            break; }
+        case MOV_ZAMBULLIDA: {
+            const float Tj = e.vel > 0.1f ? e.vel : 1.3f, Tn = 8.0f, R = e.radio, h = e.oscAmp;
+            float P = e.periodo < 2.0f * Tj + Tn + 4.0f ? 2.0f * Tj + Tn + 4.0f : e.periodo;
+            float Ti = P - 2.0f * Tj - Tn;
+            float tt = t + (float)k * P * 0.23f + e.fase * P / 6.2832f;
+            float c = floorf(tt / P), s = tt - c * P;
+            bool par = ((long)c % 2) == 0;
+            float sg = par ? 1.0f : -1.0f;
+            glm::vec3 d(cosf(e.rumbo), 0.0f, sinf(e.rumbo)), lat(-d.z, 0.0f, d.x);
+            glm::vec3 A = e.pos + lat * ((float)k - 0.5f * (float)(e.miembros - 1)) * e.dispersion - lat * R;
+            glm::vec3 base = par ? A : A + lat * (2.0f * R);
+            float yAgua = e.nivelAgua - 0.35f;
+            glm::vec3 W = base + d * e.alcance; W.y = yAgua;
+            if (s < Ti) {
+                float w = Suavizar(s / (0.4f * Ti));
+                float ang = 3.14159f * w;
+                dir = d * (-cosf(ang)) + lat * sg * sinf(ang);
+                p = base; nado = 0.0f;
+            } else if (s < Ti + Tj) {
+                float u = (s - Ti) / Tj;
+                p = base + d * (e.alcance * u);
+                p.y = e.pos.y + (yAgua - e.pos.y) * u + h * 4.0f * u * (1.0f - u);
+                nado = Suavizar(u * 1.6f);
+            } else if (s < Ti + Tj + Tn) {
+                float u = (s - Ti - Tj) / Tn, th = 3.14159f * u;
+                p = W + lat * (sg * R * (1.0f - cosf(th))) + d * (R * sinf(th));
+                p.y = yAgua - e.profundidad * sinf(th);
+            } else {
+                float u = (s - Ti - Tj - Tn) / Tj;
+                glm::vec3 W2 = W + lat * (sg * 2.0f * R), B = base + lat * (sg * 2.0f * R);
+                p = W2 + (B - W2) * u; p.y = yAgua + (e.pos.y - yAgua) * u + h * 4.0f * u * (1.0f - u);
+                nado = 1.0f - Suavizar((u - 0.4f) * 1.8f);
+            }
+            break; }
+        default: break;
+        }
+        return p;
+    }
+
     // Matriz de modelo de un miembro k del elemento en el tiempo t
     glm::mat4 Matriz(const Elemento& e, int idx, int k, float t) const
     {
-        glm::vec3 p = e.pos, dir(1.0f, 0.0f, 0.0f);
-        bool orientar = false;
-        float signo = e.vel >= 0.0f ? 1.0f : -1.0f;
-        glm::vec3 off = k > 0 ? Aleatorio3(idx * 97 + k) * e.dispersion : glm::vec3(0.0f);
-        float yawUsar = e.yaw;
+        glm::vec3 p = e.pos;
+        float yawUsar = e.yaw, escUsar = e.escala, pitch = 0.0f, roll = 0.0f, nado = 0.0f, yawMov = 0.0f;
         glm::vec3 rotUsar = e.rotExtra;
-        float escUsar = e.escala;
+        bool orientar = false;
+        glm::vec3 off = k > 0 ? Aleatorio3(idx * 97 + k) * e.dispersion : glm::vec3(0.0f);
         switch (e.mov) {
         case MOV_FIJO:
             p.y += e.baseY + sinf(t * e.oscVel + e.fase) * e.oscAmp;
@@ -627,40 +820,98 @@ private:
         case MOV_KF:
             if (e.kf) e.kf->PoseAt(t - e.kfInicio + (e.kf->loop ? e.fase : 0.0f), p, yawUsar, rotUsar, escUsar);
             break;
-        case MOV_ORBITA:
-        case MOV_CARDUMEN: {
-            float a = t * e.vel * velFauna + e.fase - (k > 0 ? (0.15f + 0.25f * Aleatorio(idx, k)) * signo * (float)(k % 7) * 0.3f : 0.0f);
-            float r = e.radio + off.x;
-            p = e.pos + glm::vec3(cosf(a) * r, off.y + sinf(t * e.oscVel + e.fase + k) * e.oscAmp, sinf(a) * r);
-            p.y += e.baseY;
-            dir = glm::vec3(-sinf(a), 0.0f, cosf(a)) * signo;
-            orientar = true;
-            break; }
-        case MOV_LIBRE: {
-            float a = t * e.vel * velFauna + e.fase;
-            p = e.pos + glm::vec3(e.radio * sinf(a), sinf(t * e.oscVel + e.fase) * e.oscAmp, e.radio * 0.6f * sinf(2.0f * a)) + off;
-            dir = glm::vec3(e.radio * cosf(a), 0.0f, e.radio * 1.2f * cosf(2.0f * a)) * signo;
-            orientar = true;
-            break; }
         case MOV_DERIVA:
             p += glm::vec3(sinf(t * 0.21f + e.fase) * 0.6f, sinf(t * 0.37f + e.fase) * 0.5f, cosf(t * 0.17f + e.fase) * 0.6f);
             p.y += e.baseY;
             break;
+        case MOV_ORBITA: case MOV_CARDUMEN: case MOV_LIBRE: case MOV_RUTA: case MOV_BARCO: case MOV_ZAMBULLIDA: {
+            glm::vec3 d0, d1, d2, q1, q2;
+            float n1, n2;
+            p = PosMovil(e, idx, k, t, nado, d0);
+            q1 = PosMovil(e, idx, k, t + 0.12f, n1, d1);
+            q2 = PosMovil(e, idx, k, t + 0.24f, n2, d2);
+            glm::vec3 v1 = q1 - p, v2 = q2 - q1;
+            float h1 = sqrtf(v1.x * v1.x + v1.z * v1.z), h2 = sqrtf(v2.x * v2.x + v2.z * v2.z);
+            glm::vec3 dir = glm::dot(d0, d0) > 0.0f ? d0 : v1;
+            if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(1.0f, 0.0f, 0.0f);
+            yawMov = atan2f(-dir.z, dir.x);
+            if (e.mov == MOV_BARCO) {
+                pitch = 0.015f * sinf(t * 0.7f + e.fase); roll = 0.025f * sinf(t * 0.9f);
+            } else if (!e.pulsar && glm::dot(d0, d0) == 0.0f) {
+                if (h1 > 1e-4f && (glm::dot(d0, d0) == 0.0f)) {
+                    pitch = atan2f(v1.y, h1); pitch = pitch > 0.6f ? 0.6f : (pitch < -0.6f ? -0.6f : pitch);
+                    if (e.mov != MOV_ZAMBULLIDA && e.mov != MOV_RUTA) pitch *= 0.6f;
+                    if (h2 > 1e-4f) {
+                        float dy = atan2f(-v2.z, v2.x) - atan2f(-v1.z, v1.x);
+                        while (dy > 3.14159f) dy -= 6.28318f;
+                        while (dy < -3.14159f) dy += 6.28318f;
+                        roll = -dy / 0.12f * 0.45f; roll = roll > 0.4f ? 0.4f : (roll < -0.4f ? -0.4f : roll);
+                    }
+                }
+                if (nado > 0.5f && e.mov != MOV_ZAMBULLIDA) yawMov += 0.07f * sinf(t * e.velNado * 0.6f + e.fase + k);
+            }
+            orientar = true;
+            break; }
         }
         glm::mat4 M = glm::translate(glm::mat4(1.0f), p);
-        if (orientar) M = glm::rotate(M, atan2f(-dir.z, dir.x), glm::vec3(0.0f, 1.0f, 0.0f));
+        if (orientar) {
+            M = glm::rotate(M, yawMov, glm::vec3(0.0f, 1.0f, 0.0f));
+            if (pitch != 0.0f) M = glm::rotate(M, pitch, glm::vec3(0, 0, 1));
+            if (roll != 0.0f) M = glm::rotate(M, roll, glm::vec3(1, 0, 0));
+            if (e.mov == MOV_ZAMBULLIDA) rotUsar = glm::mix(e.rotExtra, e.rotNado, nado);
+        }
         else M = glm::rotate(M, glm::radians(yawUsar), glm::vec3(0.0f, 1.0f, 0.0f));
-        if (e.mov == MOV_DERIVA) M = glm::rotate(M, t * 0.2f + e.fase, glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f)));
         if (rotUsar.x != 0.0f) M = glm::rotate(M, glm::radians(rotUsar.x), glm::vec3(1, 0, 0));
         if (rotUsar.y != 0.0f) M = glm::rotate(M, glm::radians(rotUsar.y), glm::vec3(0, 1, 0));
         if (rotUsar.z != 0.0f) M = glm::rotate(M, glm::radians(rotUsar.z), glm::vec3(0, 0, 1));
-        float s = escUsar * (k > 0 ? 0.85f + 0.3f * Aleatorio(idx, k + 50) : 1.0f) * (1.0f + 0.8f * e.inflado);
-        glm::vec3 sv(s);
+        if (e.mov == MOV_DERIVA) M = glm::rotate(M, t * 0.2f + e.fase, glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f)));
+        float sc = escUsar * (k > 0 ? 0.85f + 0.3f * Aleatorio(idx, k + 50) : 1.0f) * (1.0f + 0.8f * e.inflado);
+        glm::vec3 sv(sc);
         if (e.pulsar) {   // la campana se contrae (mas angosta y alta) y se relaja
             float pu = sinf(t * 2.2f + e.fase + k * 1.3f);
-            sv = glm::vec3(s * (1.0f - 0.10f * pu), s * (1.0f + 0.12f * pu), s * (1.0f - 0.10f * pu));
+            sv = glm::vec3(sc * (1.0f - 0.10f * pu), sc * (1.0f + 0.12f * pu), sc * (1.0f - 0.10f * pu));
         }
         return glm::scale(M, sv);
+    }
+
+    // Altura del hielo caminable bajo (x, z): el punto mas alto que no pase de maxY. Falso si no hay hielo.
+    bool SueloHielo(float x, float z, float maxY, float t, float& yOut) const
+    {
+        bool hay = false; float mejor = -1e9f;
+        for (size_t i = 0; i < elementos.size(); i++) {
+            const Elemento& e = elementos[i];
+            if (!e.caminable || !e.visible || !e.modelo) continue;
+            glm::mat4 M = Matriz(e, (int)i, 0, t);
+            glm::vec3 c = glm::vec3(M[3]);
+            float rr = e.radioBase * e.escala * 1.2f + 1.0f;
+            if ((x - c.x) * (x - c.x) + (z - c.z) * (z - c.z) > rr * rr) continue;
+            glm::mat4 inv = glm::inverse(M);
+            glm::vec3 o = glm::vec3(inv * glm::vec4(x, maxY + 50.0f, z, 1.0f));
+            glm::vec3 dd = glm::normalize(glm::vec3(inv * glm::vec4(0.0f, -1.0f, 0.0f, 0.0f)));
+            for (auto& me : e.modelo->meshes) {
+                for (size_t q = 0; q + 2 < me.indices.size(); q += 3) {
+                    const glm::vec3& a = me.vertices[me.indices[q]].Position;
+                    const glm::vec3& b = me.vertices[me.indices[q + 1]].Position;
+                    const glm::vec3& cc = me.vertices[me.indices[q + 2]].Position;
+                    glm::vec3 e1 = b - a, e2 = cc - a, pv = glm::cross(dd, e2);
+                    float det = glm::dot(e1, pv);
+                    if (fabsf(det) < 1e-9f) continue;
+                    float inv_d = 1.0f / det;
+                    glm::vec3 tv = o - a;
+                    float u = glm::dot(tv, pv) * inv_d;
+                    if (u < 0.0f || u > 1.0f) continue;
+                    glm::vec3 qv = glm::cross(tv, e1);
+                    float v = glm::dot(dd, qv) * inv_d;
+                    if (v < 0.0f || u + v > 1.0f) continue;
+                    float th = glm::dot(e2, qv) * inv_d;
+                    if (th < 0.0f) continue;
+                    glm::vec3 hit = glm::vec3(M * glm::vec4(o + dd * th, 1.0f));
+                    if (hit.y <= maxY && hit.y > mejor) { mejor = hit.y; hay = true; }
+                }
+            }
+        }
+        if (hay) yOut = mejor;
+        return hay;
     }
 
     void ConfigurarShader(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, const Camera* camBuzo = nullptr)
@@ -699,6 +950,7 @@ private:
         sh->setFloat("uMuerte", 0.0f);
         sh->setFloat("uFantasma", 0.0f);
         sh->setInt("uOndulaEje", 0);
+        sh->setInt("uSkinning", 0);
         sh->setFloat("uSpecPower", 40.0f);
         sh->setFloat("uSpecInt", 0.25f);
         sh->setFloat("uMetalico", 0.0f);
@@ -734,7 +986,7 @@ private:
             if (!EnVista(glm::vec3(M[3]), e.radioBase * EscalaMax(M) * 1.15f)) continue;
             sh->setFloat("uFase", e.fase + k * 1.3f);
             sh->setMat4("model", M);
-            e.modelo->Draw(*sh);
+            e.modelo->Draw(*sh, e.modelo->TieneAnimacion() ? t + e.fase + k * 0.37f : -1.0f);
         }
     }
 
@@ -826,8 +1078,45 @@ private:
             elementos.push_back(a);
         }
         Elemento payasos = Nadador("PezPayaso", c, MOV_CARDUMEN, glm::vec3(-6.0f, 0.9f, -4.4f), 1.1f, 0.6f, "Pez payaso");
+		payasos.rotExtra = glm::vec3(0.0f, 180.0f, 0.0f);
         payasos.miembros = 6; payasos.dispersion = 0.5f; payasos.velNado = 12.0f; payasos.sobreSuelo = true; payasos.oscAmp = 0.2f;
         elementos.push_back(payasos);
+
+        // Pez loro recorre el claro central con seis cuadros clave.
+        Elemento pezLoro = Nadador("PezLoro", c, MOV_KF, glm::vec3(0.0f, 4.2f, 0.0f), 0.0f, 0.0f, "Pez loro");
+        pezLoro.kf = GuardarKF(KF_PezLoro(pezLoro.pos));
+        pezLoro.ondula = 0.05f; pezLoro.velNado = 4.0f; pezLoro.fase = 1.5f;
+        elementos.push_back(pezLoro);
+
+        // Estrella de corona de espinas (cerca de los parches de coral pero sin chocar)
+        Elemento corona1 = Fijo("EstrellaCorona", c, glm::vec3(0.0f, 0.00f, 0.0f), 45, 1.0f);
+        corona1.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta la estrella horizontalmente
+        corona1.interactivo = true;
+        corona1.etiqueta = "Estrella corona de espinas";
+		MatOpaco(corona1);
+        elementos.push_back(corona1);
+
+        Elemento corona2 = Fijo("EstrellaCorona", c, glm::vec3(-2.5f, 0.05f, 6.5f), 120, 0.9f);
+        corona2.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta la estrella horizontalmente
+        corona2.interactivo = true;
+        corona2.etiqueta = "Estrella corona de espinas";
+		MatOpaco(corona2);
+        elementos.push_back(corona2);
+
+        // Pepino de mar (en zonas más arenosas / cerca del pasto marino)
+        Elemento pepino1 = Fijo("PepinoMar", c, glm::vec3(-12.0f, 0.0f, 8.5f), 75, 1.0f);
+		pepino1.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta el pepino horizontalmente
+        pepino1.interactivo = true;
+        pepino1.etiqueta = "Pepino de mar";
+		MatPlastico(pepino1);
+        elementos.push_back(pepino1);
+
+        Elemento pepino2 = Fijo("PepinoMar", c, glm::vec3(3.0f, 0.0f, 10.0f), 210, 1.1f);
+		pepino2.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); // Acuesta el pepino horizontalmente
+        pepino2.interactivo = true;
+        pepino2.etiqueta = "Pepino de mar";
+		MatPlastico(pepino2);
+        elementos.push_back(pepino2);
 
         // 17 Pradera de pasto marino con 08 manati y 03 caballitos de mar
         Elemento pasto = Fijo("pasto_marino", c, glm::vec3(0.0f, -0.05f, 0.0f), 0, 1);
@@ -842,7 +1131,7 @@ private:
         caballito.pos = glm::vec3(-16.0f, 0.6f, 14.0f); caballito.yaw = 130; caballito.fase = 4.0f; elementos.push_back(caballito);
 
         // 07 Almejas, 05 pulpo y 15 langostas en el fondo
-        Elemento almeja = Fijo("almejagigante", c, glm::vec3(7.5f, 0.2f, -6.0f), 30, 1.0f);
+        Elemento almeja = Fijo("Almeja", c, glm::vec3(7.5f, 0.2f, -6.0f), 30, 1.0f);
         almeja.interactivo = true; almeja.etiqueta = "Almeja gigante"; almeja.esCoral = true; almeja.sensibilidad = 0.7f;
         almeja.tinte = glm::vec3(0.75f, 0.85f, 1.15f);
         {   // KF: la almeja abre y cierra la concha (animacion por cuadros clave de Julian)
@@ -855,6 +1144,7 @@ private:
         pulpo.interactivo = true; pulpo.etiqueta = "Pulpo"; pulpo.camuflaje = true; pulpo.mecer = 0.3f; pulpo.fase = 1.0f;
         elementos.push_back(pulpo);
         Elemento langosta = Fijo("langosta", c, glm::vec3(9.0f, 0.02f, -6.5f), 160, 1.0f);
+		langosta.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f);
         langosta.interactivo = true; langosta.etiqueta = "Langosta";
         elementos.push_back(langosta);
         langosta.pos = glm::vec3(-3.5f, 0.02f, 10.5f); langosta.yaw = 20; elementos.push_back(langosta);
@@ -869,13 +1159,18 @@ private:
         Elemento cirujanos = Nadador("Pezcirujano", c, MOV_CARDUMEN, glm::vec3(7.0f, 2.6f, -9.0f), 4.0f, -0.4f, "Pez cirujano azul");
         cirujanos.miembros = 7; cirujanos.dispersion = 1.0f; cirujanos.velNado = 11.0f; cirujanos.sobreSuelo = true;
         elementos.push_back(cirujanos);
-        Elemento globo = Nadador("pez_globo", c, MOV_ORBITA, glm::vec3(-1.0f, 1.8f, 8.0f), 2.5f, 0.25f, "Pez globo");
+        Elemento globo = Nadador("PezGlobo", c, MOV_ORBITA, glm::vec3(-1.0f, 1.8f, 8.0f), 2.5f, 0.25f, "Pez globo");
+		globo.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f);
         globo.inflable = true; globo.sobreSuelo = true; globo.ondula = 0.03f; globo.oscAmp = 0.3f; elementos.push_back(globo);
         globo.pos = glm::vec3(12.0f, 2.2f, 4.0f); globo.vel = -0.2f; globo.fase = 2.0f; elementos.push_back(globo);
         globo.pos = glm::vec3(1.0f, 2.5f, -1.0f); globo.radio = 4.0f; globo.vel = 0.15f; globo.fase = 4.0f; elementos.push_back(globo);
-        Elemento tortuga = Nadador("tortuga", c, MOV_ORBITA, glm::vec3(0.0f, 4.5f, 0.0f), 11.0f, 0.09f, "Tortuga marina");
-        tortuga.ondula = 0.0f; tortuga.oscAmp = 1.0f; tortuga.oscVel = 0.3f; elementos.push_back(tortuga);
-        tortuga.pos = glm::vec3(-12.0f, 3.5f, 6.0f); tortuga.radio = 7.0f; tortuga.vel = -0.11f; tortuga.fase = 2.5f; tortuga.escala = 0.85f; elementos.push_back(tortuga);
+        Elemento tortuga = Nadador("tortuga", c, MOV_KF, glm::vec3(0.0f, 4.5f, 0.0f), 10.5f, 0.09f, "Tortuga marina");
+        tortuga.ondula = 0.0f; tortuga.oscAmp = 0.0f; tortuga.oscVel = 1.0f;
+        tortuga.kf = GuardarKF(KF_TortugaArrecife(tortuga.pos, 10.5f, 1.0f));
+        elementos.push_back(tortuga);
+        tortuga.pos = glm::vec3(-12.0f, 3.5f, 6.0f); tortuga.fase = 2.5f; tortuga.escala = 0.85f;
+        tortuga.kf = GuardarKF(KF_TortugaArrecife(tortuga.pos, 6.0f, 0.85f));
+        elementos.push_back(tortuga);
         Elemento manta = Nadador("mantaraya", c, MOV_LIBRE, glm::vec3(0.0f, 8.0f, -6.0f), 22.0f, 0.06f, "Mantarraya");
         manta.ondula = 0.0f; manta.oscAmp = 1.5f; manta.oscVel = 0.25f; elementos.push_back(manta);
         Elemento delfines = Nadador("delfin", c, MOV_CARDUMEN, glm::vec3(0.0f, 10.5f, 0.0f), 24.0f, 0.22f, "Delfin nariz de botella");
@@ -909,48 +1204,83 @@ private:
 
         Elemento roca = Fijo("roca_fria", c, glm::vec3(0.0f, -0.5f, 0.0f), 0, 1); roca.etiqueta = "Roca";
         Esparcir(roca, 16, glm::vec2(0.0f), 3.0f, 34.0f, 0.8f, 2.8f, 12);
-        // plataformas de hielo flotando en la superficie
-        for (int i = 0; i < 7; i++) {
-            Elemento h = Fijo(i % 2 ? "hielo2" : "hielo1", c, glm::vec3(0.0f), 0, 1);
-            float a = Aleatorio(70, i) * 6.28f, r = 6.0f + 24.0f * Aleatorio(71, i);
-            h.pos = glm::vec3(cosf(a) * r, cfg.superficieY + 0.05f, sinf(a) * r);
-            h.sobreSuelo = false; h.yaw = Aleatorio(72, i) * 360.0f; h.escala = 1.0f + 0.7f * Aleatorio(73, i);
-            if (i == 0) h.pos = glm::vec3(5.0f, cfg.superficieY - 0.9f, 4.0f);
-            h.oscAmp = 0.08f; h.oscVel = 0.5f; h.fase = (float)i;
-            h.interactivo = true; h.etiqueta = "Plataforma de hielo";
+        // plataformas de hielo: el buzo puede subirse; los animales descansan, se lanzan al agua y regresan
+        const float sy = cfg.superficieY;
+        auto hacerPlataforma = [&](const char* archivo, float x, float z, float esc, float yaw) {
+            Elemento h = Fijo(archivo, c, glm::vec3(x, sy + 0.7f, z), yaw, esc);
+            h.sobreSuelo = false; h.interactivo = true; h.etiqueta = "Plataforma de hielo"; h.caminable = true;
             h.tinte = glm::vec3(0.85f, 0.95f, 1.05f); h.emision = 0.55f;   // luz que atraviesa el hielo
-            MatTraslucido(h);
+            MatTraslucido(h); h.alpha = 0.9f;
             elementos.push_back(h);
-        }
-        Elemento ice = Fijo("iceberg", c, glm::vec3(-30.0f, cfg.superficieY, -22.0f), 30, 1.6f); ice.sobreSuelo = false; ice.etiqueta = "Iceberg"; ice.interactivo = true;
-        ice.tinte = glm::vec3(0.85f, 0.95f, 1.05f); ice.emision = 0.45f;
-        MatTraslucido(ice);
-        elementos.push_back(ice);
-        ice.pos = glm::vec3(34.0f, cfg.superficieY, 10.0f); ice.yaw = 140; ice.escala = 1.3f; elementos.push_back(ice);
+        };
+        // habitante de una plataforma: n individuos que se turnan para zambullirse hacia el centro de la zona
+        auto habitante = [&](const char* archivo, const char* etiqueta, float x, float z, float esc, int n, float disp, float radio, float periodo, float fase, float salto, float altura) {
+            Elemento a = Nadador(archivo, c, MOV_ZAMBULLIDA, glm::vec3(x, sy + 0.7f, z), radio, salto, etiqueta);
+            a.sobreSuelo = false; a.sobreHielo = true; a.miembros = n; a.dispersion = disp; a.periodo = periodo; a.fase = fase;
+            a.rumbo = atan2f(-z, -x); a.alcance = 5.0f * esc + 1.5f; a.profundidad = 2.6f; a.nivelAgua = sy; a.oscAmp = altura;
+            a.ondula = 0.0f; a.velNado = 3.0f;
+            elementos.push_back(a);
+            return elementos.size() - 1;
+        };
+        hacerPlataforma("hielo1", 18.0f, 24.0f, 1.4f, 20.0f);
+        hacerPlataforma("hielo2", -6.0f, 26.0f, 1.2f, 100.0f);
+        hacerPlataforma("hielo1", -30.0f, 18.0f, 1.4f, 200.0f);
+        hacerPlataforma("hielo2", 28.0f, -24.0f, 1.2f, 40.0f);
+        hacerPlataforma("hielo1", -10.0f, -26.0f, 1.3f, 300.0f);
+        hacerPlataforma("hielo2", 8.0f, -32.0f, 1.0f, 150.0f);
 
-        Elemento ballena = Nadador("ballena", c, MOV_KF, glm::vec3(0.0f, 8.0f, -8.0f), 30.0f, 0.035f, "Ballena azul");
-        ballena.kf = &KF_Ballena();   // KF #1: salto y reingreso
-        ballena.ondula = 0.25f; ballena.velNado = 1.5f; ballena.oscAmp = 1.0f; ballena.oscVel = 0.15f;
+        // la cueva de hielo: un oso polar vigila desde la cima
+        {
+            Elemento cueva = Fijo("cueva_meshy", c, glm::vec3(-36.0f, sy + 2.6f, -26.0f), 30.0f, 8.0f);
+            cueva.sobreSuelo = false; cueva.interactivo = true; cueva.etiqueta = "Cueva de hielo"; cueva.caminable = true;
+            cueva.specInt = 0.35f; cueva.specPower = 48.0f;
+            elementos.push_back(cueva);
+            Elemento oso2 = Fijo("osito", c, glm::vec3(-36.0f, sy + 6.0f, -26.0f + 2.3f), 200.0f, 1.0f);
+            oso2.sobreSuelo = false; oso2.sobreHielo = true; oso2.interactivo = true; oso2.etiqueta = "Oso polar";
+            elementos.push_back(oso2);
+        }
+        // icebergs de Meshy (la mayor parte queda bajo el agua)
+        {
+            Elemento ice = Fijo("iceberg_meshy", c, glm::vec3(38.0f, sy, 30.0f), 30.0f, 11.0f);
+            ice.sobreSuelo = false; ice.etiqueta = "Iceberg"; ice.interactivo = true;
+            ice.tinte = glm::vec3(0.9f, 0.98f, 1.05f); ice.emision = 0.3f; ice.specInt = 0.35f; ice.specPower = 64.0f;
+            elementos.push_back(ice);
+            ice.pos = glm::vec3(-12.0f, sy, -48.0f); ice.yaw = 140.0f; ice.escala = 9.0f; elementos.push_back(ice);
+        }
+
+        // rompehielos: cruza la zona de lado a lado por un canal libre de hielo
+        {
+            Elemento barco = Fijo("rompehielos", c, glm::vec3(0.0f, sy + 0.31f * 11.0f, 0.0f), 0.0f, 11.0f);
+            barco.sobreSuelo = false; barco.interactivo = true; barco.etiqueta = "Rompehielos";
+            barco.mov = MOV_BARCO; barco.vel = 3.2f; barco.reloj = 25.0f; barco.rotExtra = glm::vec3(0.0f, 180.0f, 0.0f);
+            barco.specInt = 0.5f; barco.specPower = 40.0f; barco.metalico = 0.3f;
+            elementos.push_back(barco);
+        }
+
+        Elemento ballena = Nadador("ballena", c, MOV_RUTA, glm::vec3(0.0f, 9.0f, -4.0f), 30.0f, 0.06f, "Ballena azul");
+        ballena.ondula = 0.25f; ballena.velNado = 1.5f; ballena.oscAmp = 3.5f; ballena.ondulaVertical = true;
         elementos.push_back(ballena);
         Elemento belugas = Nadador("beluga", c, MOV_CARDUMEN, glm::vec3(0.0f, 7.0f, 4.0f), 15.0f, -0.12f, "Beluga");
         belugas.miembros = 3; belugas.dispersion = 2.0f; belugas.ondula = 0.12f; belugas.velNado = 3.0f;
         elementos.push_back(belugas);
-        Elemento focas = Nadador("foca", c, MOV_CARDUMEN, glm::vec3(4.0f, 9.0f, -4.0f), 9.0f, 0.35f, "Foca");
-        focas.miembros = 3; focas.dispersion = 1.8f; focas.ondula = 0.1f; focas.velNado = 6.0f; focas.oscAmp = 1.2f;
-        elementos.push_back(focas);
-        Elemento pinguinos = Nadador("pinguino", c, MOV_CARDUMEN, glm::vec3(-6.0f, 12.5f, 2.0f), 7.0f, 0.7f, "Pinguino");
-        pinguinos.miembros = 6; pinguinos.dispersion = 1.2f; pinguinos.rotExtra = glm::vec3(0.0f, 0.0f, -90.0f);
-        pinguinos.ondula = 0.0f; pinguinos.oscAmp = 0.8f; pinguinos.oscVel = 1.5f;
-        elementos.push_back(pinguinos);
+
+        // animales del hielo (cada plataforma tiene su especie)
         {
-            Elemento oso = Fijo("osito", c, glm::vec3(5.0f, cfg.superficieY - 0.9f + 0.79f, 4.0f), 20.0f, 1.0f);
-            oso.sobreSuelo = false; oso.interactivo = true; oso.etiqueta = "Oso polar";
-            oso.oscAmp = 0.08f; oso.oscVel = 0.5f; oso.fase = 0.0f;
-            elementos.push_back(oso);
+            size_t i0 = habitante("osito", "Oso polar", 18.0f, 24.0f, 1.4f, 1, 0.0f, 2.8f, 40.0f, 0.0f, 2.4f, 0.7f);
+            elementos[i0].escala = 1.1f;
+            size_t i1 = habitante("pinguino", "Pinguino", -6.0f, 26.0f, 1.2f, 5, 1.1f, 2.4f, 22.0f, 1.0f, 1.2f, 1.9f);
+            elementos[i1].rotNado = glm::vec3(0.0f, 0.0f, -90.0f); elementos[i1].escala = 1.5f;
+            habitante("foca", "Foca", -30.0f, 18.0f, 1.4f, 2, 1.5f, 2.6f, 30.0f, 2.2f, 1.6f, 0.9f);
+            size_t i3 = habitante("morsa", "Morsa", 28.0f, -24.0f, 1.2f, 2, 2.0f, 2.8f, 46.0f, 3.1f, 2.4f, 0.5f);
+            elementos[i3].escala = 1.1f;
+            habitante("LeonMarino2", "Leon marino", -10.0f, -26.0f, 1.3f, 2, 1.8f, 2.6f, 26.0f, 4.0f, 1.3f, 1.4f);
+            size_t i5 = habitante("pinguino", "Pinguino", 8.0f, -32.0f, 1.0f, 4, 1.0f, 2.2f, 24.0f, 5.0f, 1.2f, 1.9f);
+            elementos[i5].rotNado = glm::vec3(0.0f, 0.0f, -90.0f); elementos[i5].escala = 1.5f;
         }
-        Elemento morsa = Fijo("morsa", c, glm::vec3(-8.0f, 0.5f, -6.0f), 60, 1.0f); morsa.interactivo = true; morsa.etiqueta = "Morsa";
-        elementos.push_back(morsa);
-        morsa.pos = glm::vec3(-5.0f, 0.5f, -9.0f); morsa.yaw = 150; morsa.escala = 0.9f; elementos.push_back(morsa);
+        // focas que nadan en mar abierto, lentas
+        Elemento focas = Nadador("foca", c, MOV_CARDUMEN, glm::vec3(4.0f, 9.0f, -4.0f), 11.0f, 0.13f, "Foca");
+        focas.miembros = 3; focas.dispersion = 1.8f; focas.ondula = 0.1f; focas.velNado = 2.5f; focas.oscAmp = 0.9f;
+        elementos.push_back(focas);
         Elemento krill = Nadador("Krill", c, MOV_CARDUMEN, glm::vec3(-4.0f, 6.0f, -6.0f), 5.0f, 0.25f, "Krill");
         krill.miembros = 60; krill.dispersion = 2.5f; krill.escala = 1.4f; krill.ondula = 0.0f; krill.oscAmp = 0.6f;
         elementos.push_back(krill);

@@ -32,7 +32,7 @@ public:
     void Reiniciar(Escenario& esc)
     {
         temperatura = T_INICIAL; hielo = 1.0f; estadoFinal = 0; hitos = 0; objCalor = false; objFantasma = false;
-        avisos.clear(); fotos.clear(); alimentados.clear();
+        avisos.clear(); fotos.clear(); alimentados.clear(); barcoParado = 0.0f; barcoXPrev = -999.0f;
         krillMochila = 0; pescadoMochila = 0; flash = 0.0f; marco = 0.0f;
         for (int i = 0; i < 4; i++) { pob[i] = 1.0f; apoyo[i] = 0.0f; }
 
@@ -41,7 +41,7 @@ public:
             Base b;
             b.escala = e.escala; b.alpha = e.alpha; b.emision = e.emision; b.tinte = e.tinte; b.posY = e.pos.y;
             b.tipo = 0;
-            if (e.archivo == "hielo1" || e.archivo == "hielo2" || e.archivo == "iceberg") b.tipo = 1;
+            if (e.archivo == "hielo1" || e.archivo == "hielo2" || e.archivo == "iceberg" || e.archivo == "iceberg_meshy") b.tipo = 1;
             else if (EsFantasma(e.archivo)) b.tipo = 2;
             base.push_back(b);
             e.visible = true; e.presencia = 1.0f; e.fantasma = 0.0f;
@@ -74,6 +74,13 @@ public:
             if (pescadoMochila < 5) { pescadoMochila++; sonarRecoger = true; Aviso("Recogiste pescado (" + std::to_string(pescadoMochila) + "/5).", glm::vec3(1.0f, 0.8f, 0.6f), 3.5f); }
             else Aviso("Tu bolsa de pescado está llena. Dáselo a un animal.", glm::vec3(0.8f, 0.9f, 1.0f), 3.0f);
         }
+        else if (n == "Rompehielos") {
+            barcoParado = 10.0f; sonarAlerta = true;
+            Aviso("El rompehielos se detiene a observar. Sus motores y su hollín aceleran el deshielo: más barcos en el Ártico, menos hielo.", glm::vec3(1.0f, 0.85f, 0.55f), 6.0f);
+        }
+        else if (n == "Cueva de hielo") {
+            Aviso("Las cuevas de hielo son refugios de osos polares. Si el hielo se derrite, pierden su guarida y su zona de caza.", glm::vec3(0.6f, 0.95f, 1.0f), 5.5f);
+        }
         else if (n == "Plataforma de hielo" || n == "Iceberg") {
             temperatura = temperatura + 0.5f > T_MAX ? T_MAX : temperatura + 0.5f;
             Aviso("Calentaste el agua 0.5 °C: el hielo empieza a ceder. Así actúa el calentamiento global.", glm::vec3(1.0f, 0.8f, 0.5f), 4.5f);
@@ -81,7 +88,7 @@ public:
         else if (n == "Bacalao" || n == "Ballena azul") {
             Alimentar(e, n, true);
         }
-        else if (n == "Foca" || n == "Pinguino" || n == "Oso polar" || n == "Orca" || n == "Leon marino") {
+        else if (n == "Foca" || n == "Pinguino" || n == "Morsa" || n == "Oso polar" || n == "Orca" || n == "Leon marino") {
             Alimentar(e, n, false);
         }
     }
@@ -115,9 +122,21 @@ public:
         tReloj += dt;
 
         auto& elems = esc.Elementos();
+        barcoParado = barcoParado > dt ? barcoParado - dt : 0.0f;
         for (size_t i = 0; i < elems.size() && i < base.size(); i++) {
             Elemento& e = elems[i];
             const Base& b = base[i];
+            if (e.mov == MOV_BARCO) {
+                if (barcoParado <= 0.0f) e.reloj += dt;
+                float bx = esc.Posicion((int)i, esc.tiempoJuego).x;
+                if (barcoXPrev > -500.0f && barcoXPrev < 0.0f && bx >= 0.0f) {   // cruzo el centro de la zona
+                    float antes = temperatura;
+                    temperatura = temperatura + 0.35f > T_MAX ? T_MAX : temperatura + 0.35f;
+                    sonarAlerta = true;
+                    Aviso(temperatura > antes ? "Pasó el rompehielos: abrió un canal y calentó el agua 0.35 °C. Haz clic en el barco para detenerlo." : "Pasó el rompehielos por el canal.", glm::vec3(1.0f, 0.85f, 0.55f), 6.5f);
+                }
+                barcoXPrev = bx;
+            }
             if (b.tipo == 1) {
                 e.escala = b.escala * (0.05f + 0.95f * hielo);
                 e.visible = hielo > 0.03f;
@@ -190,7 +209,7 @@ public:
     std::string Detalle(const Elemento& e, glm::vec3& color) const
     {
         char b[96];
-        if (e.archivo == "hielo1" || e.archivo == "hielo2" || e.archivo == "iceberg") {
+        if (e.archivo == "hielo1" || e.archivo == "hielo2" || e.archivo == "iceberg" || e.archivo == "iceberg_meshy") {
             color = hielo > 0.5f ? glm::vec3(0.6f, 0.95f, 1.0f) : glm::vec3(1.0f, 0.7f, 0.5f);
             snprintf(b, sizeof(b), "Hielo restante: %d%%  ·  Clic: calentar el agua", (int)(hielo * 100.0f + 0.5f));
             return b;
@@ -204,6 +223,8 @@ public:
             color = glm::vec3(0.5f, 1.0f, 0.6f); return "Estado: sano" + pista;
         }
         color = glm::vec3(1.0f, 0.85f, 0.6f);
+        if (e.archivo == "rompehielos") return "Clic: detener el barco  ·  su paso calienta el agua";
+        if (e.archivo == "cueva_meshy") return "Refugio de osos polares";
         if (e.archivo == "Krill") return "Clic: recoger krill  ·  X: foto";
         if (e.archivo == "pescado") return "Clic: recoger pescado";
         if (e.archivo == "bacalao") return "Clic: dar de comer (krill)  ·  X: foto";
@@ -361,6 +382,7 @@ private:
     float apoyo[4] = { 0, 0, 0, 0 };
     float flash = 0.0f, marco = 0.0f, tReloj = 0.0f;
     bool objCalor = false, objFantasma = false;
+    float barcoParado = 0.0f, barcoXPrev = -999.0f;
 
     float Suave(float x) const { x = x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x); return x * x * (3.0f - 2.0f * x); }
     float Nivel(int i) const { float v = pob[i] + apoyo[i]; return v > 1.0f ? 1.0f : v; }
@@ -373,7 +395,7 @@ private:
 
     static bool EsFantasma(const std::string& a)
     {
-        return a == "ballena" || a == "foca" || a == "pinguino" || a == "osito" || a == "Orca2" || a == "Narwhal2" || a == "Cachalote2" || a == "LeonMarino2";
+        return a == "ballena" || a == "foca" || a == "pinguino" || a == "osito" || a == "morsa" || a == "Orca2" || a == "Narwhal2" || a == "Cachalote2" || a == "LeonMarino2";
     }
 
     void TomarFoto(Escenario& esc)

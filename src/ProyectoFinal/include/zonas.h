@@ -959,20 +959,21 @@ private:
         Elemento pescados = Nadador("pescado", "arrecifes", MOV_CARDUMEN, glm::vec3(-10.0f, 5.0f, 8.0f), 6.0f, 0.3f, "Pescado");
         pescados.miembros = 5; pescados.dispersion = 1.4f; elementos.push_back(pescados);
 
+        // Orca2, Narwhal2, Cachalote2 y LeonMarino2 ya vienen con Y arriba (exporta_al_juego.py): sin rotExtra
         Elemento orcas = Nadador("Orca2", c, MOV_CARDUMEN, glm::vec3(-12.0f, 7.0f, -14.0f), 18.0f, 0.12f, "Orca");
-        orcas.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); orcas.miembros = 3; orcas.dispersion = 3.0f; orcas.ondula = 0.08f; orcas.velNado = 4.0f; orcas.oscAmp = 0.8f;
+        orcas.miembros = 3; orcas.dispersion = 3.0f; orcas.ondula = 0.08f; orcas.velNado = 4.0f; orcas.oscAmp = 0.8f;
         elementos.push_back(orcas);
         Elemento narvales = Nadador("Narwhal2", c, MOV_CARDUMEN, glm::vec3(14.0f, 9.0f, -18.0f), 12.0f, -0.10f, "Narval");
-        narvales.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); narvales.miembros = 2; narvales.dispersion = 2.5f; narvales.ondula = 0.08f; narvales.velNado = 4.0f; narvales.oscAmp = 0.6f;
+        narvales.miembros = 2; narvales.dispersion = 2.5f; narvales.ondula = 0.08f; narvales.velNado = 4.0f; narvales.oscAmp = 0.6f;
         elementos.push_back(narvales);
         Elemento cachalote = Nadador("Cachalote2", c, MOV_LIBRE, glm::vec3(0.0f, 5.0f, -22.0f), 22.0f, 0.05f, "Cachalote");
-        cachalote.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); cachalote.tinte = glm::vec3(0.55f, 0.65f, 0.8f); cachalote.ondula = 0.10f; cachalote.velNado = 2.5f; cachalote.oscAmp = 1.2f; cachalote.oscVel = 0.2f;
+        cachalote.tinte = glm::vec3(0.55f, 0.65f, 0.8f); cachalote.ondula = 0.10f; cachalote.velNado = 2.5f; cachalote.oscAmp = 1.2f; cachalote.oscVel = 0.2f;
         elementos.push_back(cachalote);
         Elemento calamar = Nadador("Calamar2", c, MOV_ORBITA, glm::vec3(-14.0f, 3.0f, 10.0f), 8.0f, 0.08f, "Calamar colosal");
         calamar.ondula = 0.15f; calamar.velNado = 3.0f; calamar.oscAmp = 1.0f;
         elementos.push_back(calamar);
         Elemento leones = Nadador("LeonMarino2", c, MOV_CARDUMEN, glm::vec3(10.0f, 10.0f, 14.0f), 9.0f, 0.30f, "Leon marino");
-        leones.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); leones.miembros = 3; leones.dispersion = 1.8f; leones.ondula = 0.10f; leones.velNado = 6.0f; leones.oscAmp = 1.0f;
+        leones.miembros = 3; leones.dispersion = 1.8f; leones.ondula = 0.10f; leones.velNado = 6.0f; leones.oscAmp = 1.0f;
         elementos.push_back(leones);
         Elemento dracoides = Nadador("pezdracoide", "arrecifes", MOV_CARDUMEN, glm::vec3(-2.0f, 4.0f, 14.0f), 6.0f, 0.35f, "Pez dracoide");
         dracoides.miembros = 6; dracoides.dispersion = 1.4f; dracoides.tinte = glm::vec3(0.75f, 0.9f, 1.1f);

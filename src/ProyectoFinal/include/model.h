@@ -362,6 +362,16 @@ private:
 
         // 1. diffuse maps
         vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+        if (diffuseMaps.empty()) {
+            // sin imagen: textura de 1x1 con el color del material (ojos, piezas de color liso)
+            aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);
+            aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &color);
+            Texture colorTex;
+            colorTex.id = TextureFromColor(color);
+            colorTex.type = "texture_diffuse";
+            colorTex.path = "";
+            diffuseMaps.push_back(colorTex);
+        }
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
         // 2. specular maps
         vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");

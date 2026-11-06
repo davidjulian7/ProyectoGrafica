@@ -44,6 +44,7 @@
 #include <zonas.h>         // contenido y render de las tres zonas
 #include <arrecife.h>      // Zona 1: termómetro y blanqueamiento de coral
 #include <naufragios.h>    // Zona 3: limpieza, pez león, red fantasma y cofre
+#include <aguas_frias.h>    // Zona 2: termómetro, deshielo, fantasmas, fotos y cadena trófica
 #include <cmath>
 
 #include <irrKlang.h>
@@ -85,6 +86,7 @@ float zonaTiempo = 0.0f;    // segundos dentro de la zona actual
 Escenario escenario;        // zonas de inmersión (include/zonas.h)
 MecanicaArrecife arrecife;  // mecánica de la Zona 1 (include/arrecife.h)
 MecanicaNaufragios naufragio; // mecánica de la Zona 3 (include/naufragios.h)
+MecanicaAguasFrias aguasFrias; // mecánica de la Zona 2 (include/aguas_frias.h)
 
 // --- Buzo: nado con inercia (etapa 1) ---
 glm::vec3 diverVelocity(0.0f);
@@ -507,6 +509,12 @@ bool Update() {
 		if (arrecife.sonarAlerta) { Efecto("sound/alerta.wav", 0.6f); arrecife.sonarAlerta = false; }
 		if (arrecife.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); arrecife.sonarDescubrir = false; }
 	}
+	if (estadoActual == AGUAS_FRIAS) {
+		aguasFrias.Actualizar(deltaTime, window, escenario, escenario.Seleccionado());
+		if (aguasFrias.sonarAlerta) { Efecto("sound/alerta.wav", 0.5f); aguasFrias.sonarAlerta = false; }
+		if (aguasFrias.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); aguasFrias.sonarDescubrir = false; }
+		if (aguasFrias.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); aguasFrias.sonarRecoger = false; }
+	}
 	if (estadoActual == NAUFRAGIOS) {
 		naufragio.Actualizar(deltaTime, animTime, window, escenario, camera, escenario.Seleccionado());
 		if (naufragio.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); naufragio.sonarRecoger = false; }
@@ -553,9 +561,11 @@ bool Update() {
 	glm::vec3 colorDetalle(1.0f);
 	std::string detalle = !sel ? std::string()
 		: estadoActual == ARRECIFES ? arrecife.Detalle(*sel, colorDetalle)
+		: estadoActual == AGUAS_FRIAS ? aguasFrias.Detalle(*sel, colorDetalle)
 		: estadoActual == NAUFRAGIOS ? naufragio.Detalle(*sel, colorDetalle) : std::string();
 	menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
 	if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
+	if (estadoActual == AGUAS_FRIAS) aguasFrias.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 	if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
 	zonaFade = zonaFade - deltaTime * 1.4f;
@@ -661,8 +671,11 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		if (estadoActual == NAUFRAGIOS && !escenario.modoEdicion)
 			naufragio.Clic(escenario.seleccion, escenario, animTime);   // recoger, retirar invasor, cofre
-		else
+		else {
+			if (estadoActual == AGUAS_FRIAS && !escenario.modoEdicion)
+				aguasFrias.Clic(escenario);   // recoger krill/pescado y alimentar
 			escenario.Interactuar();   // ver el nombre del animal
+		}
 		// En modo edición, el clic también fija el objeto a editar
 		if (escenario.modoEdicion)
 			escenario.FijarEditableDesdeSeleccion();
@@ -777,6 +790,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 	else if (estadoActual == ARRECIFES && !escenario.modoEdicion)
 		arrecife.Tecla(key, escenario);   // R restaurar, T calentamiento automático
+	else if (estadoActual == AGUAS_FRIAS && !escenario.modoEdicion)
+		aguasFrias.Tecla(key, escenario); // R reiniciar, X foto
 }
 
 // ---------------------------------------------------------------------------
@@ -806,6 +821,7 @@ void EntrarZona(int zona)
 	// Carga la zona (la primera vez lee sus modelos) y coloca al buzo en su punto de inicio
 	escenario.Entrar(zona, camera);
 	if (zona == ARRECIFES) arrecife.Reiniciar(escenario);
+	if (zona == AGUAS_FRIAS) aguasFrias.Reiniciar(escenario);
 	if (zona == NAUFRAGIOS) naufragio.Reiniciar(escenario, animTime);
 	const char* ambientes[] = { "", "sound/ambiente_arrecife.wav", "sound/ambiente_frio.wav", "sound/ambiente_naufragio.wav" };
 	Ambiente(ambientes[zona], silencio ? 0.0f : 0.6f);

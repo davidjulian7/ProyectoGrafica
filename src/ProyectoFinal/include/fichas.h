@@ -73,6 +73,13 @@ inline const std::map<std::string, Ficha>& Fichas()
         { "Bacalao", { "Bacalao", "FAUNA", "Vulnerable (UICN)", "Fue tan pescado en el Atlántico Norte que algunas poblaciones colapsaron en los años 90.", true } },
         { "Plataforma de hielo", { "Plataforma de hielo", "HÁBITAT", "Hielo marino", "El hielo marino del Ártico en verano se ha reducido drásticamente desde 1979.", false } },
         { "Iceberg", { "Iceberg", "HÁBITAT", "Hielo de glaciar", "Solo vemos cerca de una décima parte: el resto queda bajo el agua.", false } },
+        { "Orca", { "Orca", "FAUNA", "Datos insuficientes (UICN)", "Es el depredador tope del océano: caza en manada y también se alimenta de focas y pingüinos.", true } },
+        { "Narval", { "Narval", "FAUNA", "Casi amenazado (UICN)", "Su 'cuerno' es un diente largo. Vive bajo el hielo del Ártico y es muy sensible a su pérdida.", true } },
+        { "Cachalote", { "Cachalote", "FAUNA", "Vulnerable (UICN)", "Bucea más de mil metros para cazar calamares gigantes en la oscuridad.", true } },
+        { "Calamar colosal", { "Calamar colosal", "FAUNA", "Preocupación menor (UICN)", "Es el invertebrado más grande que existe y casi nunca se ha visto vivo.", true } },
+        { "Leon marino", { "León marino", "FAUNA", "Varía por especie", "Descansa en costas y plataformas de hielo; si cambia su comida por el calentamiento, pasa hambre.", true } },
+        { "Pez dracoide", { "Pez dracoide", "FAUNA", "Varía por especie", "Algunos peces de hielo antárticos tienen la sangre transparente porque no tienen hemoglobina.", true } },
+        { "Pescado", { "Pescado", "FAUNA", "Alimento", "Los peces como este son el alimento de focas, pingüinos y osos polares.", false } },
 
         // ---------------- Zona 3: Naufragios
         { "Submarino hundido", { "Submarino hundido", "NAUFRAGIO", "Huella humana", "Los restos de barcos y submarinos pueden liberar combustible y metales durante décadas.", false } },

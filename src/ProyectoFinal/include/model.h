@@ -556,6 +556,38 @@ private:
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
     // the required info is returned as a Texture struct.
+    // Textura incrustada en el .fbx: se busca por "*N" o por nombre de archivo
+    unsigned int TexturaIncrustada(const char* ruta)
+    {
+        if (!ruta || !scene) return 0;
+        auto nombre = [](std::string s) {
+            for (char& c : s) { if (c == '\\') c = '/'; c = (char)tolower((unsigned char)c); }
+            s = s.substr(s.find_last_of('/') + 1);
+            return s.substr(0, s.find_last_of('.'));
+        };
+        const aiTexture* t = nullptr;
+        if (ruta[0] == '*') { unsigned int i = (unsigned int)atoi(ruta + 1); if (i < scene->mNumTextures) t = scene->mTextures[i]; }
+        else for (unsigned int i = 0; i < scene->mNumTextures && !t; i++)
+            if (nombre(scene->mTextures[i]->mFilename.C_Str()) == nombre(ruta)) t = scene->mTextures[i];
+        if (!t || t->mHeight != 0) return 0;
+        int w = 0, h = 0, n = 0;
+        unsigned char* datos = stbi_load_from_memory((const unsigned char*)t->pcData, (int)t->mWidth, &w, &h, &n, 0);
+        if (!datos) return 0;
+        GLenum formato = n == 1 ? GL_RED : (n == 3 ? GL_RGB : GL_RGBA);
+        unsigned int id;
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, formato, w, h, 0, formato, GL_UNSIGNED_BYTE, datos);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        stbi_image_free(datos);
+        return id;
+    }
+
     vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName)
     {
         vector<Texture> textures;
@@ -577,7 +609,8 @@ private:
             if(!skip)
             {   // if texture hasn't been loaded already, load it
                 Texture texture;
-                texture.id = TextureFromFile(str.C_Str(), this->directory);
+                texture.id = TexturaIncrustada(str.C_Str());
+                if (texture.id == 0) texture.id = TextureFromFile(str.C_Str(), this->directory);
                 texture.type = typeName;
                 texture.path = str.C_Str();
                 textures.push_back(texture);

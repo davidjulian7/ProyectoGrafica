@@ -871,6 +871,7 @@ private:
             float a = Aleatorio(70, i) * 6.28f, r = 6.0f + 24.0f * Aleatorio(71, i);
             h.pos = glm::vec3(cosf(a) * r, cfg.superficieY + 0.05f, sinf(a) * r);
             h.sobreSuelo = false; h.yaw = Aleatorio(72, i) * 360.0f; h.escala = 1.0f + 0.7f * Aleatorio(73, i);
+            if (i == 0) h.pos = glm::vec3(5.0f, cfg.superficieY - 0.9f, 4.0f);
             h.oscAmp = 0.08f; h.oscVel = 0.5f; h.fase = (float)i;
             h.interactivo = true; h.etiqueta = "Plataforma de hielo";
             h.tinte = glm::vec3(0.85f, 0.95f, 1.05f); h.emision = 0.55f;   // luz que atraviesa el hielo
@@ -897,8 +898,12 @@ private:
         pinguinos.miembros = 6; pinguinos.dispersion = 1.2f; pinguinos.rotExtra = glm::vec3(0.0f, 0.0f, -90.0f);
         pinguinos.ondula = 0.0f; pinguinos.oscAmp = 0.8f; pinguinos.oscVel = 1.5f;
         elementos.push_back(pinguinos);
-        Elemento oso = Nadador("osito", c, MOV_ORBITA, glm::vec3(8.0f, cfg.superficieY - 0.55f, 8.0f), 10.0f, 0.05f, "Oso polar");
-        oso.ondula = 0.0f; oso.oscAmp = 0.05f; elementos.push_back(oso);
+        {
+            Elemento oso = Fijo("osito", c, glm::vec3(5.0f, cfg.superficieY - 0.9f + 0.79f, 4.0f), 20.0f, 1.0f);
+            oso.sobreSuelo = false; oso.interactivo = true; oso.etiqueta = "Oso polar";
+            oso.oscAmp = 0.08f; oso.oscVel = 0.5f; oso.fase = 0.0f;
+            elementos.push_back(oso);
+        }
         Elemento morsa = Fijo("morsa", c, glm::vec3(-8.0f, 0.5f, -6.0f), 60, 1.0f); morsa.interactivo = true; morsa.etiqueta = "Morsa";
         elementos.push_back(morsa);
         morsa.pos = glm::vec3(-5.0f, 0.5f, -9.0f); morsa.yaw = 150; morsa.escala = 0.9f; elementos.push_back(morsa);
@@ -907,6 +912,27 @@ private:
         elementos.push_back(krill);
         Elemento bacalaos = Nadador("bacalao", c, MOV_CARDUMEN, glm::vec3(6.0f, 3.5f, 6.0f), 8.0f, -0.3f, "Bacalao");
         bacalaos.miembros = 9; bacalaos.dispersion = 1.6f; bacalaos.sobreSuelo = true; elementos.push_back(bacalaos);
+        Elemento pescados = Nadador("pescado", "arrecifes", MOV_CARDUMEN, glm::vec3(-10.0f, 5.0f, 8.0f), 6.0f, 0.3f, "Pescado");
+        pescados.miembros = 5; pescados.dispersion = 1.4f; elementos.push_back(pescados);
+
+        Elemento orcas = Nadador("Orca2", c, MOV_CARDUMEN, glm::vec3(-12.0f, 7.0f, -14.0f), 18.0f, 0.12f, "Orca");
+        orcas.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); orcas.miembros = 3; orcas.dispersion = 3.0f; orcas.ondula = 0.08f; orcas.velNado = 4.0f; orcas.oscAmp = 0.8f;
+        elementos.push_back(orcas);
+        Elemento narvales = Nadador("Narwhal2", c, MOV_CARDUMEN, glm::vec3(14.0f, 9.0f, -18.0f), 12.0f, -0.10f, "Narval");
+        narvales.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); narvales.miembros = 2; narvales.dispersion = 2.5f; narvales.ondula = 0.08f; narvales.velNado = 4.0f; narvales.oscAmp = 0.6f;
+        elementos.push_back(narvales);
+        Elemento cachalote = Nadador("Cachalote2", c, MOV_LIBRE, glm::vec3(0.0f, 5.0f, -22.0f), 22.0f, 0.05f, "Cachalote");
+        cachalote.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); cachalote.tinte = glm::vec3(0.55f, 0.65f, 0.8f); cachalote.ondula = 0.10f; cachalote.velNado = 2.5f; cachalote.oscAmp = 1.2f; cachalote.oscVel = 0.2f;
+        elementos.push_back(cachalote);
+        Elemento calamar = Nadador("Calamar2", c, MOV_ORBITA, glm::vec3(-14.0f, 3.0f, 10.0f), 8.0f, 0.08f, "Calamar colosal");
+        calamar.ondula = 0.15f; calamar.velNado = 3.0f; calamar.oscAmp = 1.0f;
+        elementos.push_back(calamar);
+        Elemento leones = Nadador("LeonMarino2", c, MOV_CARDUMEN, glm::vec3(10.0f, 10.0f, 14.0f), 9.0f, 0.30f, "Leon marino");
+        leones.rotExtra = glm::vec3(-90.0f, 0.0f, 0.0f); leones.miembros = 3; leones.dispersion = 1.8f; leones.ondula = 0.10f; leones.velNado = 6.0f; leones.oscAmp = 1.0f;
+        elementos.push_back(leones);
+        Elemento dracoides = Nadador("pezdracoide", "arrecifes", MOV_CARDUMEN, glm::vec3(-2.0f, 4.0f, 14.0f), 6.0f, 0.35f, "Pez dracoide");
+        dracoides.miembros = 6; dracoides.dispersion = 1.4f; dracoides.tinte = glm::vec3(0.75f, 0.9f, 1.1f);
+        elementos.push_back(dracoides);
         fuentes.clear();
     }
 

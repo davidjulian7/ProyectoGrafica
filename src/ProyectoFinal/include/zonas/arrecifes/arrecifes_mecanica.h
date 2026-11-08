@@ -17,10 +17,10 @@
 #include <set>
 #include <cstdio>
 #include <cmath>
-#include <zonas.h>
-#include <menu.h>
-#include <fichas.h>
-#include <hud_comun.h>
+#include <escena/escenario.h>
+#include <interfaz/menu.h>
+#include <interfaz/fichas.h>
+#include <interfaz/hud_comun.h>
 
 class MecanicaArrecife
 {

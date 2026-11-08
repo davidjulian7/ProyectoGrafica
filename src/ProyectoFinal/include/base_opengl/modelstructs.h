@@ -5,13 +5,13 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <stb_image.h>
+#include <base_opengl/stb_image.h>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include <mesh.h>
-#include <shader.h>
+#include <base_opengl/mesh.h>
+#include <base_opengl/shader.h>
 
 #include <string>
 #include <fstream>

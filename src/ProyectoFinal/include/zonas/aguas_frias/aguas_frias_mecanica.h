@@ -14,9 +14,9 @@
 #include <set>
 #include <cstdio>
 #include <cmath>
-#include <zonas.h>
-#include <menu.h>
-#include <fichas.h>
+#include <escena/escenario.h>
+#include <interfaz/menu.h>
+#include <interfaz/fichas.h>
 
 class MecanicaAguasFrias
 {

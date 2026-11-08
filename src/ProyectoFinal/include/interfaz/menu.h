@@ -24,12 +24,12 @@
 #include <map>
 #include <cmath>
 
-#include <shader_m.h>
-#include <stb_image.h>
+#include <base_opengl/shader_m.h>
+#include <base_opengl/stb_image.h>
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include <fichas.h>
+#include <interfaz/fichas.h>
 
 // Utilidades sin depender de std::min/std::max (Windows define macros min/max).
 inline float menuMin(float a, float b) { return a < b ? a : b; }

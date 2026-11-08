@@ -12,8 +12,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
-#include <menu.h>
-#include <fichas.h>
+#include <interfaz/menu.h>
+#include <interfaz/fichas.h>
 
 // Ordena las etiquetas por el nombre que se muestra al usuario
 inline std::vector<std::string> OrdenarEspecies(const std::set<std::string>& etiquetas)

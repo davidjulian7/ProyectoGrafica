@@ -33,18 +33,18 @@
 #include <glm/gtc/type_ptr.hpp>
 
 // Model loading classes
-#include <shader_m.h>
-#include <camera.h>
-#include <model.h>
-#include <material.h>
-#include <light.h>
-#include <cubemap.h>
-#include <particles.h>
-#include <menu.h>          // menú de inicio y HUD de zonas
-#include <zonas.h>         // contenido y render de las tres zonas
-#include <arrecife.h>      // Zona 1: termómetro y blanqueamiento de coral
-#include <naufragios.h>    // Zona 3: limpieza, pez león, red fantasma y cofre
-#include <aguas_frias.h>    // Zona 2: termómetro, deshielo, fantasmas, fotos y cadena trófica
+#include <base_opengl/shader_m.h>
+#include <camara/camera.h>
+#include <base_opengl/model.h>
+#include <iluminacion/material.h>
+#include <iluminacion/light.h>
+#include <texturas/cubemap.h>
+#include <animacion/particles.h>
+#include <interfaz/menu.h>          // menú de inicio y HUD de zonas
+#include <escena/escenario.h>         // contenido y render de las tres zonas
+#include <zonas/arrecifes/arrecifes_mecanica.h>      // Zona 1: termómetro y blanqueamiento de coral
+#include <zonas/naufragios/naufragios_mecanica.h>    // Zona 3: limpieza, pez león, red fantasma y cofre
+#include <zonas/aguas_frias/aguas_frias_mecanica.h>    // Zona 2: termómetro, deshielo, fantasmas, fotos y cadena trófica
 #include <cmath>
 
 #include <irrKlang.h>

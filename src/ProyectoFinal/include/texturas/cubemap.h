@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <stb_image.h>
+#include <base_opengl/stb_image.h>
 
 #include <string>
 #include <fstream>
@@ -14,7 +14,7 @@
 #include <map>
 #include <vector>
 #include <stdlib.h>
-#include <shader_m.h>
+#include <base_opengl/shader_m.h>
 
 using namespace std;
 

@@ -1,120 +1,182 @@
-#ifndef ANIMATEDMODEL_H
-#define ANIMATEDMODEL_H
+#ifndef MODEL_H
+#define MODEL_H
 
-#include <modelstructs.h>
+#include <glm/gtx/string_cast.hpp>
 
-// Max number of bones
-#define MAX_RIGGING_BONES 100
+#include <base_opengl/modelstructs.h>
 
-class AnimatedModel 
+class Model 
 {
 public:
     /*  Model Data */
     vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
-    vector<Mesh>    meshes;
-    string          directory;
-    bool            gammaCorrection;
+    vector<Mesh> meshes;
+    string directory;
+    bool gammaCorrection;
 
-	string          filename;
+	string filename;
 
 	/* Bones data */
-	vector<Bone>    bones;
+	vector<Bone> bones;
+
+	static const int MAX_BONES_MODEL = 50;
+	glm::mat4 m_Bones[MAX_BONES_MODEL];
+	unsigned int m_BoneShaderID = 0;
+	GLint m_BoneLocations[MAX_BONES_MODEL];
+	double m_AnimDuracion = 0.0;
+	double m_AnimFps = 24.0;
 
 	/* Scene data */
 	Assimp::Importer importer;
-	const aiScene*   scene;
+	const aiScene* scene = nullptr;
 	
 	map<string, unsigned int> m_BoneMapping; // maps a bone name to its index
-	unsigned int              m_NumBones;
-	vector<BoneInfo>          m_BoneInfo;
-	glm::mat4                 m_GlobalInverseTransform;
-
-	float	       fps;   // framerate (frames per second)
-	int		       keys;     // number of keyframes
-	int		       animationCount; // key counter
-	float          elapsedTime; // time elapsed
-
-	unsigned int   currentAnimation = 0; // first animation
-
-	// Pose inicial del modelo
-	glm::mat4 gBones[MAX_RIGGING_BONES];
+	unsigned int m_NumBones;
+	int m_BoneGroups = 1;
+	vector<BoneInfo> m_BoneInfo;
+	glm::mat4 m_GlobalInverseTransform;
+	unsigned int texture_gl;
+	unsigned int rbo_gl;
+	unsigned int framebuffer_gl;
+	unsigned int IDforPicking;
 
     /*  Functions   */
     // constructor, expects a filepath to a 3D model.
-    AnimatedModel(string const &path, unsigned int cAnimation = 0, bool gamma = false) : gammaCorrection(gamma)
+    Model(string const &path, unsigned int id = 0, bool gamma = false) : gammaCorrection(gamma)
     {
-		this->currentAnimation = cAnimation;
+		IDforPicking = id;
+		for (int i = 0; i < MAX_BONES_MODEL; i++) {
+			m_Bones[i] = glm::mat4(1.0f);
+			m_BoneLocations[i] = -1;
+		}
         loadModel(path);
     }
 
+	bool TieneAnimacion() const { return scene && scene->mNumAnimations > 0; }
+
+	void ActualizarPose(float segundos)
+	{
+		if (!TieneAnimacion()) return;
+		double total = m_AnimDuracion > 0.0 ? m_AnimDuracion : 1.0;
+		double t = std::fmod((double)segundos * m_AnimFps, total);
+		if (t < 0.0) t += total;
+		SetPose((float)t);
+	}
+
     // draws the model, and thus all its meshes
-    void Draw(Shader &shader)   // por referencia: evita copiar el shader en cada objeto
+    void Draw(Shader &shader, float animSegundos = -1.0f)   // por referencia: evita copiar el shader en cada objeto
     {
+		bool animar = animSegundos >= 0.0f && TieneAnimacion();
+		shader.setInt("uSkinning", animar ? 1 : 0);
+		if (animar) {
+			shader.setInt("uBoneGroups", m_BoneGroups);
+			ActualizarPose(animSegundos);
+			SubirHuesos(shader);
+		}
         for(unsigned int i = 0; i < meshes.size(); i++)
             meshes[i].Draw(shader);
     }
 
-	// update transformations in time 
-	void SetPose(float time, glm::mat4 *gBones) {
+	bool renderFramebufferToTexture() {
+		//glEnable(GL_DEPTH_TEST);
+		
+		glDeleteTextures(1, &texture_gl);
+		glDeleteFramebuffers(1, &framebuffer_gl);
+		glDeleteRenderbuffers(1, &rbo_gl);
+		glActiveTexture(GL_TEXTURE0);
+		// Generate texture
+		glGenTextures(1, &texture_gl);
+		glBindTexture(GL_TEXTURE_2D, texture_gl);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1024, 768, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
-		// Sin animacion valida: huesos en identidad (evita crash al cargar FBX estaticos)
-		if (!scene || scene->mNumAnimations == 0 || currentAnimation >= scene->mNumAnimations) {
-			for (unsigned int i = 0; i < MAX_RIGGING_BONES; i++) gBones[i] = glm::mat4(1.0f);
+		// Generate RBO
+		
+		glGenRenderbuffers(1, &rbo_gl);
+		glBindRenderbuffer(GL_RENDERBUFFER, rbo_gl);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1024, 768);
+
+		
+		glGenFramebuffers(1, &framebuffer_gl);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_gl);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_gl, 0);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_gl);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo_gl);
+		
+		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE)
+		{
+			// Restore current framebuffer
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			return false;
+		}
+		
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		return true;
+
+	}
+
+	// draws the model, and thus all its meshes
+	void DrawMirror(Shader shader)
+	{
+		
+		for (unsigned int i = 0; i < meshes.size(); i++)
+			meshes[i].DrawMirror(shader, texture_gl);
+	}
+
+	// update transformations in time 
+	void SetPose(float time) { SetPose(time, m_Bones); }
+
+	void SetPose(float time, glm::mat4 *gBones) {
+		if (!TieneAnimacion()) {
+			for (int i = 0; i < MAX_BONES_MODEL; i++) gBones[i] = glm::mat4(1.0f);
 			return;
 		}
 
+		// processNode(scene->mRootNode, time);
 		glm::mat4 n_matrix(1.0f);
 		ReadNodeHierarchy(time, scene->mRootNode, n_matrix);
 
-		for (unsigned int i = 0; i < bones.size(); i++) {
-			if (i < 100) {
-				gBones[i] = bones[i].transformation;
-			}
-		}
-		// Rellenar el resto con identidad para no dejar basura del frame anterior
-		for (unsigned int i = (unsigned int)bones.size(); i < MAX_RIGGING_BONES; i++)
+		for (unsigned int i = 0; i < bones.size() && i < MAX_BONES_MODEL; i++)
+			gBones[i] = bones[i].transformation;
+		for (unsigned int i = (unsigned int)bones.size(); i < MAX_BONES_MODEL; i++)
 			gBones[i] = glm::mat4(1.0f);
 	}
 
-	// update animation
-	void UpdateAnimation(float deltaTime) {
-		elapsedTime += deltaTime;
-		if (elapsedTime > 1.0f / fps) {
-			animationCount++;
-			if (animationCount > keys - 1) {
-				animationCount = 0;
+	void SubirHuesos(Shader &shader) {
+		if (m_BoneShaderID != shader.ID) {
+			m_BoneShaderID = shader.ID;
+			for (int i = 0; i < MAX_BONES_MODEL; i++) {
+				string nombre = "gBones[" + std::to_string(i) + "]";
+				m_BoneLocations[i] = glGetUniformLocation(shader.ID, nombre.c_str());
 			}
-			// Configuración de la pose en el instante t
-			SetPose((float)animationCount, gBones);
-			elapsedTime = 0.0f;
 		}
+		if (m_BoneLocations[0] != -1)
+			glUniformMatrix4fv(m_BoneLocations[0], MAX_BONES_MODEL, GL_FALSE, &m_Bones[0][0][0]);
 	}
-
-private:
 
 	// Return the duration of the animation in ticks (frames)
 	double getNumFrames() {
-
-		if (!scene || scene->mNumAnimations == 0 || currentAnimation >= scene->mNumAnimations) return -1.0;
-		const aiAnimation* pAnimation = scene->mAnimations[currentAnimation];
+		if (!TieneAnimacion()) return -1.0;
+		const aiAnimation* pAnimation = scene->mAnimations[0];
 		if (pAnimation == nullptr) return -1.0;
-
-		cout << "Animation total frames:" << pAnimation->mDuration << endl;
-
 		return pAnimation->mDuration;
-
 	}
 
 	// return the number of ticks per second
 	double getFramerate() {
-		if (!scene || scene->mNumAnimations == 0 || currentAnimation >= scene->mNumAnimations) return -1.0;
-		const aiAnimation* pAnimation = scene->mAnimations[currentAnimation];
+		if (!TieneAnimacion()) return -1.0;
+		const aiAnimation* pAnimation = scene->mAnimations[0];
 		if (pAnimation == nullptr) return -1.0;
-
-		cout << "Animation framerate:" << pAnimation->mTicksPerSecond << " fps" << endl;
-
-		return  pAnimation->mTicksPerSecond;
+		return pAnimation->mTicksPerSecond;
 	}
+
+private:
 
     /*  Functions   */
 
@@ -134,7 +196,7 @@ private:
     void loadModel(string const &path)
     {
         // read file via ASSIMP
-		scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+		scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);  // GenSmoothNormals: crea normales si el FBX no las trae
         // check for errors
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
         {
@@ -149,17 +211,20 @@ private:
 		inverseTransform.Inverse();
 		m_GlobalInverseTransform = aiMatrix4x4ToGlm(inverseTransform);
 
+		m_BoneMapping.clear();
+		bones.clear();
+		m_AnimDuracion = 0.0;
+		m_AnimFps = 24.0;
+		if (scene->mNumAnimations > 0) {
+			const aiAnimation* anim = scene->mAnimations[0];
+			if (anim) {
+				m_AnimDuracion = anim->mDuration;
+				if (anim->mTicksPerSecond > 0.0) m_AnimFps = anim->mTicksPerSecond;
+			}
+		}
+
         // process ASSIMP's root node recursively
         processNode(scene->mRootNode, scene);
-
-		fps = (float)getFramerate();
-		keys = (int)getNumFrames();
-		if (fps <= 0.0f) fps = 24.0f;          // evita division por cero en UpdateAnimation
-		if (keys < 1) keys = 1;
-		animationCount = 0;
-		elapsedTime = 0.0f;
-
-		SetPose(0.0f, gBones);
     }
 
 	void processNode(aiNode *node, float time){
@@ -202,6 +267,39 @@ private:
 
 		// cout << "NumVertices: " << mesh->mNumVertices << endl;
 
+		// Bones: registrar el esqueleto antes de los vertices para usar indices globales.
+		for (unsigned int i = 0; i < mesh->mNumBones; i++) {
+			string bname(mesh->mBones[i]->mName.data);
+			if (m_BoneMapping.count(bname)) continue;
+
+			Bone newBone;
+			newBone.name = mesh->mBones[i]->mName;
+			newBone.offsetMatrix = aiMatrix4x4ToGlm(mesh->mBones[i]->mOffsetMatrix);
+			newBone.transformation = glm::mat4(1.0f);
+			for (unsigned int j = 0; j < mesh->mBones[i]->mNumWeights; j++)
+				newBone.push(mesh->mBones[i]->mWeights[j].mVertexId, mesh->mBones[i]->mWeights[j].mWeight);
+
+			m_BoneMapping[bname] = (unsigned int)bones.size();
+			bones.push_back(newBone);
+		}
+		std::vector<std::vector<std::pair<float, float>>> influencias;
+		if (mesh->mNumBones > 0) influencias.resize(mesh->mNumVertices);
+		for (unsigned int j = 0; j < mesh->mNumBones; j++) {
+			string bname(mesh->mBones[j]->mName.data);
+			auto bit = m_BoneMapping.find(bname);
+			if (bit == m_BoneMapping.end()) continue;
+			float gId = (float)bit->second;
+			for (unsigned int k = 0; k < mesh->mBones[j]->mNumWeights; k++) {
+				const aiVertexWeight& w = mesh->mBones[j]->mWeights[k];
+				if (w.mVertexId < mesh->mNumVertices)
+					influencias[w.mVertexId].emplace_back(gId, w.mWeight);
+			}
+		}
+		for (const auto& vertexInfluencias : influencias) {
+			int grupos = (int)((vertexInfluencias.size() + MAX_NUM_BONES - 1) / MAX_NUM_BONES);
+			if (grupos > m_BoneGroups) m_BoneGroups = std::min(grupos, 3);
+		}
+
         // Walk through each of the mesh's vertices
         for(unsigned int i = 0; i < mesh->mNumVertices; i++)
         {
@@ -213,9 +311,11 @@ private:
             vector.z = mesh->mVertices[i].z;
             vertex.Position = vector;
             // normals
-            vector.x = mesh->mNormals[i].x;
-            vector.y = mesh->mNormals[i].y;
-            vector.z = mesh->mNormals[i].z;
+            if (mesh->mNormals) {
+                vector.x = mesh->mNormals[i].x;
+                vector.y = mesh->mNormals[i].y;
+                vector.z = mesh->mNormals[i].z;
+            } else vector = glm::vec3(0.0f, 1.0f, 0.0f);
             vertex.Normal = vector;
             // texture coordinates
             if(mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
@@ -230,17 +330,21 @@ private:
             else
                 vertex.TexCoords = glm::vec2(0.0f, 0.0f);
             // tangent
-            vector.x = mesh->mTangents[i].x;
-            vector.y = mesh->mTangents[i].y;
-            vector.z = mesh->mTangents[i].z;
-            vertex.Tangent = vector;
-            // bitangent
-            vector.x = mesh->mBitangents[i].x;
-            vector.y = mesh->mBitangents[i].y;
-            vector.z = mesh->mBitangents[i].z;
-            vertex.Bitangent = vector;
+            if (mesh->mTangents && mesh->mBitangents) {   // solo existen si el modelo tiene UV
+                vector.x = mesh->mTangents[i].x;
+                vector.y = mesh->mTangents[i].y;
+                vector.z = mesh->mTangents[i].z;
+                vertex.Tangent = vector;
+                vector.x = mesh->mBitangents[i].x;
+                vector.y = mesh->mBitangents[i].y;
+                vector.z = mesh->mBitangents[i].z;
+                vertex.Bitangent = vector;
+            } else {
+                vertex.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+                vertex.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
+            }
             
-			// Bones: IDs de hueso en indice GLOBAL (m_BoneMapping por nombre)
+			// Bones
 			int bcount = 0;
 			for (unsigned int pb = 0; pb < MAX_NUM_BONES; pb++) {
 				vertex.IDs1[pb] = 0.0f;
@@ -250,32 +354,15 @@ private:
 				vertex.Weights2[pb] = 0.0f;
 				vertex.Weights3[pb] = 0.0f;
 			}
-			m_NumBones = mesh->mNumBones;
-			for (unsigned int j = 0; j < mesh->mNumBones; j++) {
-				// indice global del hueso j de este mesh
-				string bname(mesh->mBones[j]->mName.data);
-				auto bit = m_BoneMapping.find(bname);
-				if (bit == m_BoneMapping.end()) continue;
-				float gId = (float)bit->second;
-
-				for (unsigned int k = 0; k < mesh->mBones[j]->mNumWeights; k++) {
-					unsigned int VertexID = mesh->mBones[j]->mWeights[k].mVertexId;
-					float Weight = (float)(mesh->mBones[j]->mWeights[k].mWeight);
-					if ( VertexID == i && bcount < MAX_NUM_BONES ) {
-						vertex.IDs1[bcount] = gId;
-						vertex.Weights1[bcount] = Weight;
-						bcount++;
-					}
-					if (VertexID == i && bcount >= MAX_NUM_BONES && bcount < 2*MAX_NUM_BONES) {
-						vertex.IDs2[bcount - MAX_NUM_BONES] = gId;
-						vertex.Weights2[bcount - MAX_NUM_BONES] = Weight;
-						bcount++;
-					}
-					if (VertexID == i && bcount >= 2 * MAX_NUM_BONES && bcount < 3 * MAX_NUM_BONES) {
-						vertex.IDs3[bcount - 2*MAX_NUM_BONES] = gId;
-						vertex.Weights3[bcount - 2*MAX_NUM_BONES] = Weight;
-						bcount++;
-					}
+			if (i < influencias.size()) {
+				glm::vec4* ids[] = { &vertex.IDs1, &vertex.IDs2, &vertex.IDs3 };
+				glm::vec4* pesos[] = { &vertex.Weights1, &vertex.Weights2, &vertex.Weights3 };
+				for (const auto& influencia : influencias[i]) {
+					if (bcount >= 3 * MAX_NUM_BONES) break;
+					int grupo = bcount / MAX_NUM_BONES, indice = bcount % MAX_NUM_BONES;
+					(*ids[grupo])[indice] = influencia.first;
+					(*pesos[grupo])[indice] = influencia.second;
+					bcount++;
 				}
 			}
 			vertices.push_back(vertex);
@@ -284,26 +371,6 @@ private:
         }
 		// cout << "Vertex readed: " << vertices.size() << endl;
 
-		// Process Bones: acumula en lista global con mapping nombre->indice
-		// (no clear: multi-malla compartia el esqueleto; los IDs de vertices usan el indice global)
-		for (unsigned int i = 0; i < mesh->mNumBones; i++) {
-			string bname(mesh->mBones[i]->mName.data);
-			if (m_BoneMapping.count(bname)) continue;
-
-			Bone  newBone;
-			newBone.name = mesh->mBones[i]->mName;
-			newBone.offsetMatrix = aiMatrix4x4ToGlm(mesh->mBones[i]->mOffsetMatrix);
-			newBone.transformation = glm::mat4(1.0f);
-
-			for (unsigned int j = 0; j < mesh->mBones[i]->mNumWeights; j++) {
-				unsigned int VertexID = mesh->mBones[i]->mWeights[j].mVertexId;
-				float Weight = mesh->mBones[i]->mWeights[j].mWeight;
-				newBone.push( VertexID, Weight );
-			}
-
-			m_BoneMapping[bname] = (unsigned int)bones.size();
-			bones.push_back(newBone);
-		}
 		// cout << "NumFaces: " << mesh->mNumFaces << endl;
 
         // now wak through each of the mesh's faces (a face is a mesh its triangle) and retrieve the corresponding vertex indices.
@@ -315,7 +382,7 @@ private:
                 indices.push_back(face.mIndices[j]);
         }
         // process materials
-        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];    
+        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
         // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER. 
         // Same applies to other texture as the following list summarizes:
@@ -325,6 +392,16 @@ private:
 
         // 1. diffuse maps
         vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
+        if (diffuseMaps.empty()) {
+            // sin imagen: textura de 1x1 con el color del material (ojos, piezas de color liso)
+            aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);
+            aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &color);
+            Texture colorTex;
+            colorTex.id = TextureFromColor(color);
+            colorTex.type = "texture_diffuse";
+            colorTex.path = "";
+            diffuseMaps.push_back(colorTex);
+        }
         textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
         // 2. specular maps
         vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
@@ -342,42 +419,35 @@ private:
 
 	void ReadNodeHierarchy(float AnimationTime, const aiNode* pNode, const glm::mat4& ParentTransform)
 	{
-		if (pNode == nullptr || scene == nullptr) return;
+		if (pNode == nullptr || scene == nullptr || scene->mNumAnimations == 0) return;
 
 		string NodeName(pNode->mName.data);
 
-		const aiAnimation* pAnimation = scene->mAnimations[currentAnimation];
+		const aiAnimation* pAnimation = scene->mAnimations[0];
 
 		//cout << NodeName << endl;
 		
-		if (pAnimation == nullptr) { 
-			cout << "Error: no valid animation index." << endl;
-			return; 
-		}
+		if (pAnimation == nullptr) return;
 
 		//cout << "valid animation" << endl;
 
 		//aiMatrix4x4 NodeTransformation(pNode->mTransformation);
-		aiMatrix4x4 NodeTransformation;
+		aiMatrix4x4 NodeTransformation(pNode->mTransformation);
 
 		const aiNodeAnim* pNodeAnim = FindNodeAnim(pAnimation, NodeName);
 		
 		if (pNodeAnim != nullptr) {
-			aiVector3D Scaling;
-			CalcInterpolatedScaling(Scaling, AnimationTime, pNodeAnim);
-			aiMatrix4x4 ScalingM;
-			if (ScalingM.IsIdentity()) 
-				aiMatrix4x4::Scaling(Scaling, ScalingM);
-
+			aiVector3D Scaling, Translation;
 			aiQuaternion RotationQ;
-			CalcInterpolatedRotation(RotationQ, AnimationTime, pNodeAnim);
+			NodeTransformation.Decompose(Scaling, RotationQ, Translation);
+			if (pNodeAnim->mNumScalingKeys > 0) CalcInterpolatedScaling(Scaling, AnimationTime, pNodeAnim);
+			if (pNodeAnim->mNumRotationKeys > 0) CalcInterpolatedRotation(RotationQ, AnimationTime, pNodeAnim);
+			if (pNodeAnim->mNumPositionKeys > 0) CalcInterpolatedPosition(Translation, AnimationTime, pNodeAnim);
+			aiMatrix4x4 ScalingM;
+			aiMatrix4x4::Scaling(Scaling, ScalingM);
 			aiMatrix4x4 RotationM(RotationQ.GetMatrix());
-
-			aiVector3D Translation;
-			CalcInterpolatedPosition(Translation, AnimationTime, pNodeAnim);
 			aiMatrix4x4 TranslationM;
-			if (ScalingM.IsIdentity())
-				aiMatrix4x4::Translation(Translation, TranslationM);
+			aiMatrix4x4::Translation(Translation, TranslationM);
 
 			// Combine the above transformations
 			NodeTransformation = TranslationM * RotationM * ScalingM;
@@ -421,6 +491,8 @@ private:
 
 	void CalcInterpolatedScaling(aiVector3D& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
+		if (AnimationTime <= (float)pNodeAnim->mScalingKeys[0].mTime) { Out = pNodeAnim->mScalingKeys[0].mValue; return; }
+		if (AnimationTime >= (float)pNodeAnim->mScalingKeys[pNodeAnim->mNumScalingKeys - 1].mTime) { Out = pNodeAnim->mScalingKeys[pNodeAnim->mNumScalingKeys - 1].mValue; return; }
 		if (pNodeAnim->mNumScalingKeys == 1) {
 			Out = pNodeAnim->mScalingKeys[0].mValue;
 			return;
@@ -455,6 +527,8 @@ private:
 
 	void CalcInterpolatedRotation(aiQuaternion& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
+		if (AnimationTime <= (float)pNodeAnim->mRotationKeys[0].mTime) { Out = pNodeAnim->mRotationKeys[0].mValue; return; }
+		if (AnimationTime >= (float)pNodeAnim->mRotationKeys[pNodeAnim->mNumRotationKeys - 1].mTime) { Out = pNodeAnim->mRotationKeys[pNodeAnim->mNumRotationKeys - 1].mValue; return; }
 		// we need at least two values to interpolate...
 		if (pNodeAnim->mNumRotationKeys == 1) {
 			Out = pNodeAnim->mRotationKeys[0].mValue;
@@ -503,6 +577,8 @@ private:
 
 	void CalcInterpolatedPosition(aiVector3D& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
 	{
+		if (AnimationTime <= (float)pNodeAnim->mPositionKeys[0].mTime) { Out = pNodeAnim->mPositionKeys[0].mValue; return; }
+		if (AnimationTime >= (float)pNodeAnim->mPositionKeys[pNodeAnim->mNumPositionKeys - 1].mTime) { Out = pNodeAnim->mPositionKeys[pNodeAnim->mNumPositionKeys - 1].mValue; return; }
 		if (pNodeAnim->mNumPositionKeys == 1) {
 			Out = pNodeAnim->mPositionKeys[0].mValue;
 			return;
@@ -522,6 +598,38 @@ private:
 
     // checks all material textures of a given type and loads the textures if they're not loaded yet.
     // the required info is returned as a Texture struct.
+    // Textura incrustada en el .fbx: se busca por "*N" o por nombre de archivo
+    unsigned int TexturaIncrustada(const char* ruta)
+    {
+        if (!ruta || !scene) return 0;
+        auto nombre = [](std::string s) {
+            for (char& c : s) { if (c == '\\') c = '/'; c = (char)tolower((unsigned char)c); }
+            s = s.substr(s.find_last_of('/') + 1);
+            return s.substr(0, s.find_last_of('.'));
+        };
+        const aiTexture* t = nullptr;
+        if (ruta[0] == '*') { unsigned int i = (unsigned int)atoi(ruta + 1); if (i < scene->mNumTextures) t = scene->mTextures[i]; }
+        else for (unsigned int i = 0; i < scene->mNumTextures && !t; i++)
+            if (nombre(scene->mTextures[i]->mFilename.C_Str()) == nombre(ruta)) t = scene->mTextures[i];
+        if (!t || t->mHeight != 0) return 0;
+        int w = 0, h = 0, n = 0;
+        unsigned char* datos = stbi_load_from_memory((const unsigned char*)t->pcData, (int)t->mWidth, &w, &h, &n, 0);
+        if (!datos) return 0;
+        GLenum formato = n == 1 ? GL_RED : (n == 3 ? GL_RGB : GL_RGBA);
+        unsigned int id;
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, formato, w, h, 0, formato, GL_UNSIGNED_BYTE, datos);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        stbi_image_free(datos);
+        return id;
+    }
+
     vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName)
     {
         vector<Texture> textures;
@@ -543,7 +651,8 @@ private:
             if(!skip)
             {   // if texture hasn't been loaded already, load it
                 Texture texture;
-                texture.id = TextureFromFile(str.C_Str(), this->directory);
+                texture.id = TexturaIncrustada(str.C_Str());
+                if (texture.id == 0) texture.id = TextureFromFile(str.C_Str(), this->directory);
                 texture.type = typeName;
                 texture.path = str.C_Str();
                 textures.push_back(texture);

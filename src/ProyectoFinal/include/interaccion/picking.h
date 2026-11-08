@@ -1,12 +1,18 @@
 #ifndef PICKING_H
 #define PICKING_H
-// (cabecera)
+// ============================================================================================
+// PICKING / SELECCION CON LA MIRA (practica 13)
+// Picking(): dibuja cada objeto interactivo con un color unico en el centro de la pantalla y lee ese pixel.
+// Asi se sabe que objeto senala la mira. Un objeto es seleccionable si e.interactivo = true.
+// [CAMBIAR] la ayuda de punteria: el valor de R (tamano en pixeles del cuadro que se revisa).
+// ============================================================================================
 
 inline void Escenario::Picking(const glm::mat4& proj, const glm::mat4& view, float t, int fbW, int fbH)
 {
     if (InspeccionActiva()) return;
     glm::mat4 inv = glm::inverse(view);
     glm::vec3 o = glm::vec3(inv[3]), d = -glm::normalize(glm::vec3(inv[2]));
+    // [CAMBIAR] tamano del area de punteria en pixeles (mas grande = mas facil seleccionar)
     int R = (int)(16.0f * fbH / 768.0f); if (R < 5) R = 5;
     float tanMitad = 1.0f / proj[1][1];
     float holgura = (R + 2) * 2.0f * tanMitad / (float)fbH;     // radio angular del cuadrito

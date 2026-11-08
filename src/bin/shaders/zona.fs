@@ -1,4 +1,9 @@
 #version 330 core
+// ============================================================================================
+// FRAGMENT SHADER DE LAS ZONAS (practicas 07, 08 y 14: Phong, varias luces, materiales y Fresnel)
+// Luces: sol (direccional, se absorbe con la profundidad), luz ambiental de hemisferio y linterna (reflector).
+// Despues: causticas, blanqueamiento del coral, brillo de borde (Fresnel) y niebla submarina.
+// ============================================================================================
 // Iluminacion submarina: luz solar que se absorbe con la profundidad (el rojo primero),
 // causticas, luz ambiental de hemisferio, linterna del buzo y niebla exponencial.
 // Incluye efectos preparados para las mecanicas: blanqueamiento y fantasma.
@@ -89,6 +94,7 @@ void main()
     float caus = uCausticas * causticas(vPosMundo.xz, uTiempo) * max(N.y, 0.0);
     vec3 H = normalize(L + V);
     vec3 F0 = mix(vec3(0.04), base, uMetalico);   // dieléctrico vs metal
+    // [CAMBIAR] brillo especular de Phong (Blinn): uSpecPower = concentracion, uSpecInt = intensidad (vienen del material)
     float spec = pow(max(dot(N, H), 0.0), uSpecPower) * uSpecInt;
     vec3 specC = F0 * spec;
     vec3 amb = mix(uAmbAbajo, uAmbArriba, N.y * 0.5 + 0.5);
@@ -99,6 +105,7 @@ void main()
         vec3 Lf = uLinternaPos - vPosMundo;
         float d = length(Lf);
         Lf /= d;
+        // [CAMBIAR] LINTERNA: 0.80 y 0.95 = apertura del cono de luz (mas cerca de 1 = haz mas angosto)
         float cono = smoothstep(0.80, 0.95, dot(-Lf, normalize(uLinternaDir)));
         float aten = 1.0 / (1.0 + 0.006 * d * d);
         color += base * vec3(1.0, 0.93, 0.78) * cono * aten * (0.3 + max(dot(N, Lf), 0.0)) * 3.2;

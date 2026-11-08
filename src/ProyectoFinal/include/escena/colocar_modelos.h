@@ -1,6 +1,12 @@
 #ifndef COLOCAR_MODELOS_H
 #define COLOCAR_MODELOS_H
-// (cabecera)
+// ============================================================================================
+// ESCENA · Colocar modelos en una zona (practicas 03, 04 y 05)
+//   Fijo(archivo, carpeta, posicion, giroY, escala) .......... objeto quieto (roca, coral, ruina)
+//   Nadador(archivo, carpeta, MOV_..., centro, radio, vel, etiqueta)  animal que se mueve
+//   Esparcir(base, n, centro, rMin, rMax, escMin, escMax, semilla)    n copias repartidas en circulo
+// Los archivos .fbx van en bin/models/zonas/<carpeta>/ (sin escribir la extension).
+// ============================================================================================
 
 inline Elemento Escenario::Fijo(const char* archivo, const char* carpeta, glm::vec3 pos, float yaw, float escala)
 {

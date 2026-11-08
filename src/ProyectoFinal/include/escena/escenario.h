@@ -1,3 +1,17 @@
+// ============================================================================================
+// ESCENA · Clase Escenario: administra la zona activa (objetos, terreno, render, picking).
+// La clase esta repartida en carpetas por tema (ver los #include al final):
+//   escena/estructuras.h ............ datos de cada objeto y de la zona
+//   escena/colocar_modelos.h ........ Fijo(), Nadador(), Esparcir(): crear objetos
+//   escena/render.h ................. Dibujar(): orden de dibujo (fondo, terreno, objetos, superficie)
+//   iluminacion/luces_y_materiales.h  luces, niebla, linterna y materiales
+//   animacion/movimientos.h ......... animacion de cada objeto (orbitas, cardumenes, KF)
+//   animacion/particulas_zona.h ..... burbujas y monedas
+//   interaccion/picking.h ........... seleccion con la mira
+//   interaccion/modo_edicion.h ...... mover/rotar/escalar objetos con E
+//   zonas/<zona>/<zona>_escena.h .... QUE hay en cada zona y donde (Construir...)
+//   zonas/<zona>/<zona>_mecanica.h .. reglas del juego de cada zona
+// ============================================================================================
 #ifndef ZONAS_H
 #define ZONAS_H
 /*
@@ -212,6 +226,7 @@ private:
     static const int N = 111;
     float respiracion = 3.0f, fuenteTiempo = 0.0f;
 public:
+    // [CAMBIAR] velocidad de TODOS los animales (1.0 = normal, 0.5 = mitad, 2.0 = doble)
     float velFauna = 0.5f;             // multiplica la velocidad de nado de toda la fauna (mas lento = mas facil de observar)
     glm::vec3 buzoVel = glm::vec3(0.0f);   // velocidad del buzo (anima el modelo y el vaiven)
     bool buzoDePie = false;            // el buzo camina sobre el hielo (cuerpo vertical)

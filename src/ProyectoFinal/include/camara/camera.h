@@ -1,3 +1,10 @@
+// ============================================================================================
+// CAMARA (practica 02: proyeccion, viewport y transformaciones de vista)
+// Camara en primera persona del buzo: posicion, orientacion (yaw/pitch), zoom y matriz de vista.
+// - El nado del buzo (aceleracion, resistencia, limites) esta en ProyectoFinal.cpp -> processInput().
+// - La proyeccion (perspectiva u ortografica, tecla 5) esta en ProyectoFinal.cpp -> Update().
+// - La camara de orbita (tecla V) tambien esta en Update().
+// ============================================================================================
 #ifndef CAMERA_H
 #define CAMERA_H
 
@@ -19,7 +26,9 @@ enum Camera_Movement {
 const float YAW         = -90.0f;
 const float PITCH       =  0.0f;
 const float SPEED       =  2.5f;
+// [CAMBIAR] SENSITIVITY: giro de la camara con el raton (mas alto = gira mas rapido).
 const float SENSITIVITY =  0.12f;   // giro del raton (antes 0.5: demasiado rapido)
+// [CAMBIAR] ZOOM: campo de vision en grados (45 normal, 60 gran angular, 30 telefoto).
 const float ZOOM        =  45.0f;
 
 

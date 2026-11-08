@@ -1,3 +1,8 @@
+// ============================================================================================
+// BASE OPENGL · Carga de modelos con Assimp (practica 05)
+// Lee archivos FBX/OBJ, sus mallas y texturas. Los modelos de las zonas se cargan con Escenario::Cargar().
+// [CAMBIAR] los pasos de Assimp (aiProcess_...) en loadModel() si un modelo se ve sin normales o volteado.
+// ============================================================================================
 #ifndef MODEL_H
 #define MODEL_H
 

@@ -1,3 +1,8 @@
+// ============================================================================================
+// BASE OPENGL · Shader (practicas 00 y 01)
+// Compila y enlaza un vertex shader y un fragment shader, y envia uniforms con setFloat, setVec3, setMat4...
+// Normalmente NO se cambia. Para usar un shader nuevo en una zona ver escena/escenario.h, metodo Init().
+// ============================================================================================
 #ifndef SHADER_H
 #define SHADER_H
 

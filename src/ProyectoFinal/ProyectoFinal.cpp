@@ -1,3 +1,10 @@
+// ============================================================================================
+// ACUARIO VIRTUAL INTERACTIVO · programa principal
+// Este archivo solo tiene: ventana y bucle principal, menu <-> zonas, entrada de teclado/raton.
+// Todo lo demas esta en include/ separado por tema (ver include/LEEME_ESTRUCTURA.md):
+//   base_opengl/  camara/  iluminacion/  texturas/  animacion/  interaccion/  interfaz/  escena/  zonas/
+// Busca [CAMBIAR] o [AGREGAR] con Ctrl+Shift+F para encontrar los puntos que se suelen modificar.
+// ============================================================================================
 /*
 * Laboratorio de Computación Gráfica e Interacción Humano-Computadora
 * Proyecto Final - Mundo Submarino
@@ -61,6 +68,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+// [AGREGAR] UNA TECLA NUEVA: dentro de key_callback agrega
+//            else if (key == GLFW_KEY_J && action == GLFW_PRESS) { /* lo que hace la tecla */ }
+//            (teclas que se mantienen presionadas, como el nado, van en processInput con glfwGetKey)
 
 // Menú de inicio y zonas
 bool UpdateMenu();
@@ -88,10 +98,13 @@ MecanicaAguasFrias aguasFrias; // mecánica de la Zona 2 (include/aguas_frias.h)
 
 // --- Buzo: nado con inercia (etapa 1) ---
 glm::vec3 diverVelocity(0.0f);
+// [CAMBIAR] NADO DEL BUZO: DIVER_ACCEL = que tan rapido acelera (velocidad maxima ~ ACCEL/DRAG);
+//            DIVER_DRAG = resistencia del agua (mas alto = se detiene antes). Shift multiplica por 2.
 const float DIVER_ACCEL = 3.5f;   // qué tan rápido arranca al aletear (velocidad máxima ~1.4 m/s)
 const float DIVER_DRAG  = 2.5f;   // resistencia del agua (frena al soltar las teclas)
 
 // Tamaño en pixeles de la ventana
+// [CAMBIAR] tamano de la ventana en pixeles (practica 02: viewport)
 const unsigned int SCR_WIDTH = 1024;
 const unsigned int SCR_HEIGHT = 768;
 
@@ -397,6 +410,7 @@ bool Update() {
 		float aspect = (float)fbW / (float)fbH;
 
 		// Proyección ortogonal (sin punto de fuga)
+		// [CAMBIAR] PROYECCION ORTOGRAFICA (tecla 5): orthoSize = cuanto se ve; los ultimos dos valores son near y far
 		projection = glm::ortho(-orthoSize * aspect, orthoSize * aspect, -orthoSize, orthoSize, 0.1f, 200.0f);
 
 		// Matriz de vista: Posición alta (Y=80), mirando al centro (0,0,0), con el "Arriba" hacia -Z
@@ -408,6 +422,8 @@ bool Update() {
 	}
 	else {
 		// Proyección de perspectiva normal y cámara del buzo
+		// [CAMBIAR] PROYECCION EN PERSPECTIVA (practica 02): campo de vision = camVista->Zoom (camara/camera.h),
+		//            0.1f = plano cercano (near), 400.0f = plano lejano (far)
 		projection = glm::perspective(glm::radians(camVista->Zoom), (float)fbW / (float)fbH, 0.1f, 400.0f);
 		view = camVista->GetViewMatrix();
 	}
@@ -566,6 +582,7 @@ void processInput(GLFWwindow* window)
 	}
 	escenario.buzoVel = diverVelocity;
 
+	// [CAMBIAR] modo de dibujo: M = lineas (wireframe), N = relleno, B = puntos (practica 01)
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)

@@ -1,3 +1,6 @@
+// ============================================================================================
+// BASE OPENGL · Shader basico de las practicas (version sin cache de uniforms). Se conserva por compatibilidad.
+// ============================================================================================
 #ifndef SHADER_H
 #define SHADER_H
 

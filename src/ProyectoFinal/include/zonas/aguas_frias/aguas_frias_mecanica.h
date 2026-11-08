@@ -1,3 +1,7 @@
+// ============================================================================================
+// ZONA 2 · AGUAS FRIAS · Reglas del juego: temperatura, deshielo, fantasmas, fotos y cadena trofica.
+// [CAMBIAR] temperaturas: constantes T_... al inicio de la clase.
+// ============================================================================================
 #ifndef AGUAS_FRIAS_H
 #define AGUAS_FRIAS_H
 /*
@@ -22,6 +26,7 @@ class MecanicaAguasFrias
 {
 public:
     // ---- termometro (grados centigrados del agua)
+    // [CAMBIAR] temperaturas de la Zona 2: minimo, maximo, congelacion e inicial (°C)
     const float T_MIN = -2.0f, T_MAX = 4.0f, T_CONGELA = 0.0f, T_INICIAL = -1.5f;
     float temperatura = -1.5f;
     float hielo = 1.0f;

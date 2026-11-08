@@ -1,3 +1,6 @@
+// ============================================================================================
+// INTERFAZ · Paneles comunes: lista de especies (tecla L) y anuncio de "Zona completada".
+// ============================================================================================
 #ifndef HUD_COMUN_H
 #define HUD_COMUN_H
 /*

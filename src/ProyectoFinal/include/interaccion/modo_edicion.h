@@ -1,6 +1,10 @@
 #ifndef MODO_EDICION_H
 #define MODO_EDICION_H
-// (cabecera)
+// ============================================================================================
+// MODO EDICION (practicas 02 y 04: transformaciones) · tecla E
+// Permite mover (WASD), subir/bajar (Espacio/Ctrl), rotar (Q/R, 1-4) y escalar (- / =) el objeto senalado.
+// F5 guarda la pose en la consola para copiarla al codigo de la zona.
+// ============================================================================================
 
 inline Elemento* Escenario::Editable()
 {

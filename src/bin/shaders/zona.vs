@@ -1,4 +1,11 @@
 #version 330 core
+// ============================================================================================
+// VERTEX SHADER DE LAS ZONAS (practicas 02, 09 y 10)
+// Transforma cada vertice (projection * view * model) y anima de forma procedural:
+//   - ondulacion del cuerpo al nadar (uOndula, uVelNado, uOndulaEje)
+//   - vaiven de algas, pasto marino y anemonas (uMecer)
+//   - skinning de modelos con huesos (tortuga)
+// ============================================================================================
 // Objetos de las zonas: ondulacion del cuerpo al nadar y vaiven de algas.
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
@@ -61,6 +68,7 @@ void main()
         // 0 en la cabeza, 1 en la cola: la cola se mueve mas que la cabeza
         float t = clamp((uLargo - p.x) / (2.0 * uLargo), 0.0, 1.0);
         float w = uOndula * pow(t, 1.6) * uLargo;
+        // [CAMBIAR] forma de la onda al nadar: el 3.0 = numero de ondas en el cuerpo; uTiempo * uVelNado = rapidez
         float onda = w * sin(p.x / uLargo * 3.0 - uTiempo * uVelNado + uFase);
         if (uOndulaEje == 1) p.y += onda; else p.z += onda;
     }

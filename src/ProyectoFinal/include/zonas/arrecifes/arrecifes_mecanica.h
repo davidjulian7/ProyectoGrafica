@@ -1,3 +1,7 @@
+// ============================================================================================
+// ZONA 1 · ARRECIFES · Reglas del juego: termometro, estres termico, blanqueamiento, avisos y HUD.
+// [CAMBIAR] temperaturas (umbral, minimo, maximo): constantes T_... al inicio de la clase.
+// ============================================================================================
 #ifndef ARRECIFE_H
 #define ARRECIFE_H
 /*
@@ -25,6 +29,7 @@
 class MecanicaArrecife
 {
 public:
+    // [CAMBIAR] temperaturas de la Zona 1: minimo, maximo, umbral de blanqueamiento, recuperacion e inicial (°C)
     const float T_MIN = 26.0f, T_MAX = 34.0f, T_UMBRAL = 29.0f, T_RECUPERA = 28.0f, T_INICIAL = 26.5f;
     float temperatura = 26.5f;
     bool automatico = false;

@@ -1,11 +1,18 @@
 #ifndef NAUFRAGIOS_ESCENA_H
 #define NAUFRAGIOS_ESCENA_H
-// (cabecera)
+// ============================================================================================
+// ZONA 3 · NAUFRAGIOS · Que objetos hay y donde estan (ConstruirNaufragios).
+// [CAMBIAR] luz, niebla y color del agua: bloque cfg.* al inicio (el agua se aclara al limpiar: ver la mecanica).
+// [AGREGAR] basura: copia una linea residuo("archivo", "Etiqueta", tipo, peso, cantidad, ...).
+// ============================================================================================
 
 inline void Escenario::ConstruirNaufragios()
 {
     cfg = ZonaConfig();
     cfg.nombre = "Naufragios";
+    // [CAMBIAR] AMBIENTE DE LA ZONA: niebla = color del agua (R,G,B de 0 a 1); densidad = que tan turbia (0.01 clara, 0.05 turbia);
+    //            solColor = color e intensidad del sol; solDir = direccion de la luz; ambArriba/ambAbajo = luz ambiental;
+    //            causticas = reflejos de luz en el fondo (0 a 1); superficieY = altura de la superficie; inicioCamara = donde aparece el buzo.
     cfg.niebla = glm::vec3(0.035f, 0.075f, 0.060f);   // agua turbia: empieza oscura y se aclara al limpiar
     cfg.densidad = 0.045f;
     cfg.solColor = glm::vec3(0.40f, 0.52f, 0.46f) * 0.6f;

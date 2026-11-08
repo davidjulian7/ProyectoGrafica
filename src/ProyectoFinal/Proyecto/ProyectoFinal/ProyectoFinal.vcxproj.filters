@@ -1,46 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Fuentes">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{6A1E4C2B-3D5F-4E7A-9B8C-1D2E3F4A5B6C}</UniqueIdentifier>
-      <Extensions>vs;fs;glsl</Extensions>
-    </Filter>
-    <Filter Include="Encabezados">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
+    <Filter Include="1 Base OpenGL (practicas 00, 01, 05)"><UniqueIdentifier>{64f575f4-afc9-586d-8724-2ab38641fbc6}</UniqueIdentifier></Filter>
+    <Filter Include="2 Camara (practica 02)"><UniqueIdentifier>{48028c50-2dc2-5de1-b10b-aa750a7ab4db}</UniqueIdentifier></Filter>
+    <Filter Include="3 Iluminacion y materiales (07, 08, 14)"><UniqueIdentifier>{83668ae3-0574-56a6-985f-a7c427469b06}</UniqueIdentifier></Filter>
+    <Filter Include="4 Texturas (06)"><UniqueIdentifier>{3e33bac0-7b4c-5994-b3bc-7a92b8806b15}</UniqueIdentifier></Filter>
+    <Filter Include="5 Animacion: KF, procedural, particulas (09-11)"><UniqueIdentifier>{77d13ac6-f6d5-5eba-8d2d-12afc2b00b0b}</UniqueIdentifier></Filter>
+    <Filter Include="6 Interaccion: picking y edicion (13)"><UniqueIdentifier>{2abe8ff1-7d1b-5590-a282-08e999e6d3ba}</UniqueIdentifier></Filter>
+    <Filter Include="7 Interfaz: menu, HUD, fichas"><UniqueIdentifier>{bc819eae-34e7-502c-b3c5-297fb0b5b44d}</UniqueIdentifier></Filter>
+    <Filter Include="8 Escena (clase Escenario)"><UniqueIdentifier>{4b2d63e0-2071-5f7a-9231-c857db38fb04}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas"><UniqueIdentifier>{01f05d7a-5357-50c4-89c7-735687b01a38}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas\Zona 1 Arrecifes"><UniqueIdentifier>{4d99e5da-7d57-5b7d-b342-9da1b7cab63c}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas\Zona 2 Aguas Frias"><UniqueIdentifier>{ce40e065-cf23-5898-8f0f-08da81a748d0}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas\Zona 3 Naufragios"><UniqueIdentifier>{c100fb2e-d635-598e-a095-6e62898bc261}</UniqueIdentifier></Filter>
+    <Filter Include="Programa principal"><UniqueIdentifier>{1e69cfdd-3462-5501-941e-b6215bb2952b}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\ProyectoFinal.cpp">
-      <Filter>Fuentes</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\stb_image.cpp">
-      <Filter>Fuentes</Filter>
-    </ClCompile>
+    <ClCompile Include="..\..\ProyectoFinal.cpp"><Filter>Programa principal</Filter></ClCompile>
+    <ClCompile Include="..\..\stb_image.cpp"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\menu.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\camera.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\modelstructs.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\zonas.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\arrecife.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\fichas.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\naufragios.h"><Filter>Encabezados</Filter></ClInclude>
-    <ClInclude Include="..\..\include\model.h"><Filter>Encabezados</Filter></ClInclude>
+    <ClInclude Include="..\..\include\animacion\animatedmodel.h"><Filter>5 Animacion: KF, procedural, particulas (09-11)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\animacion\keyframes.h"><Filter>5 Animacion: KF, procedural, particulas (09-11)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\animacion\movimientos.h"><Filter>5 Animacion: KF, procedural, particulas (09-11)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\animacion\particles.h"><Filter>5 Animacion: KF, procedural, particulas (09-11)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\animacion\particulas_zona.h"><Filter>5 Animacion: KF, procedural, particulas (09-11)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\base_opengl\mesh.h"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\base_opengl\model.h"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\base_opengl\modelstructs.h"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\base_opengl\shader.h"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\base_opengl\shader_m.h"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\base_opengl\stb_image.h"><Filter>1 Base OpenGL (practicas 00, 01, 05)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\camara\camera.h"><Filter>2 Camara (practica 02)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\escena\colocar_modelos.h"><Filter>8 Escena (clase Escenario)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\escena\escenario.h"><Filter>8 Escena (clase Escenario)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\escena\estructuras.h"><Filter>8 Escena (clase Escenario)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\escena\render.h"><Filter>8 Escena (clase Escenario)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\iluminacion\light.h"><Filter>3 Iluminacion y materiales (07, 08, 14)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\iluminacion\luces_y_materiales.h"><Filter>3 Iluminacion y materiales (07, 08, 14)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\iluminacion\material.h"><Filter>3 Iluminacion y materiales (07, 08, 14)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\interaccion\modo_edicion.h"><Filter>6 Interaccion: picking y edicion (13)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\interaccion\picking.h"><Filter>6 Interaccion: picking y edicion (13)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\interfaz\fichas.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
+    <ClInclude Include="..\..\include\interfaz\hud_comun.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
+    <ClInclude Include="..\..\include\interfaz\menu.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
+    <ClInclude Include="..\..\include\texturas\cubemap.h"><Filter>4 Texturas (06)</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas\aguas_frias\aguas_frias_escena.h"><Filter>9 Zonas\Zona 2 Aguas Frias</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas\aguas_frias\aguas_frias_mecanica.h"><Filter>9 Zonas\Zona 2 Aguas Frias</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas\arrecifes\arrecifes_escena.h"><Filter>9 Zonas\Zona 1 Arrecifes</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas\arrecifes\arrecifes_mecanica.h"><Filter>9 Zonas\Zona 1 Arrecifes</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas\naufragios\naufragios_escena.h"><Filter>9 Zonas\Zona 3 Naufragios</Filter></ClInclude>
+    <ClInclude Include="..\..\include\zonas\naufragios\naufragios_mecanica.h"><Filter>9 Zonas\Zona 3 Naufragios</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\bin\shaders\menu_fondo.vs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\menu_fondo.fs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\menu_ui.vs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\menu_ui.fs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\zona.vs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\zona.fs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\zona_fondo.fs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\zona_superficie.vs"><Filter>Shaders</Filter></None>
-    <None Include="..\..\..\bin\shaders\zona_superficie.fs"><Filter>Shaders</Filter></None>
+    <None Include="..\..\include\LEEME_ESTRUCTURA.md"><Filter>Programa principal</Filter></None>
   </ItemGroup>
 </Project>

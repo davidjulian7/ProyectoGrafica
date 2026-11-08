@@ -141,18 +141,44 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\ProyectoFinal.cpp" />
-    <ClCompile Include="..\..\stb_image.cpp" />
+    <ClInclude Include="..\..\include\animacion\animatedmodel.h" />
+    <ClInclude Include="..\..\include\animacion\keyframes.h" />
+    <ClInclude Include="..\..\include\animacion\movimientos.h" />
+    <ClInclude Include="..\..\include\animacion\particles.h" />
+    <ClInclude Include="..\..\include\animacion\particulas_zona.h" />
+    <ClInclude Include="..\..\include\base_opengl\mesh.h" />
+    <ClInclude Include="..\..\include\base_opengl\model.h" />
+    <ClInclude Include="..\..\include\base_opengl\modelstructs.h" />
+    <ClInclude Include="..\..\include\base_opengl\shader.h" />
+    <ClInclude Include="..\..\include\base_opengl\shader_m.h" />
+    <ClInclude Include="..\..\include\base_opengl\stb_image.h" />
+    <ClInclude Include="..\..\include\camara\camera.h" />
+    <ClInclude Include="..\..\include\escena\colocar_modelos.h" />
+    <ClInclude Include="..\..\include\escena\escenario.h" />
+    <ClInclude Include="..\..\include\escena\estructuras.h" />
+    <ClInclude Include="..\..\include\escena\render.h" />
+    <ClInclude Include="..\..\include\iluminacion\light.h" />
+    <ClInclude Include="..\..\include\iluminacion\luces_y_materiales.h" />
+    <ClInclude Include="..\..\include\iluminacion\material.h" />
+    <ClInclude Include="..\..\include\interaccion\modo_edicion.h" />
+    <ClInclude Include="..\..\include\interaccion\picking.h" />
+    <ClInclude Include="..\..\include\interfaz\fichas.h" />
+    <ClInclude Include="..\..\include\interfaz\hud_comun.h" />
+    <ClInclude Include="..\..\include\interfaz\menu.h" />
+    <ClInclude Include="..\..\include\texturas\cubemap.h" />
+    <ClInclude Include="..\..\include\zonas\aguas_frias\aguas_frias_escena.h" />
+    <ClInclude Include="..\..\include\zonas\aguas_frias\aguas_frias_mecanica.h" />
+    <ClInclude Include="..\..\include\zonas\arrecifes\arrecifes_escena.h" />
+    <ClInclude Include="..\..\include\zonas\arrecifes\arrecifes_mecanica.h" />
+    <ClInclude Include="..\..\include\zonas\naufragios\naufragios_escena.h" />
+    <ClInclude Include="..\..\include\zonas\naufragios\naufragios_mecanica.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\menu.h" />
-    <ClInclude Include="..\..\include\camera.h" />
-    <ClInclude Include="..\..\include\modelstructs.h" />
-    <ClInclude Include="..\..\include\zonas.h" />
-    <ClInclude Include="..\..\include\arrecife.h" />
-    <ClInclude Include="..\..\include\fichas.h" />
-    <ClInclude Include="..\..\include\naufragios.h" />
-    <ClInclude Include="..\..\include\model.h" />
+    <None Include="..\..\include\LEEME_ESTRUCTURA.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\ProyectoFinal.cpp" />
+    <ClCompile Include="..\..\stb_image.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\bin\shaders\menu_fondo.vs" />

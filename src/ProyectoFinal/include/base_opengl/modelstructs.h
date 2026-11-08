@@ -1,3 +1,7 @@
+// ============================================================================================
+// BASE OPENGL · Estructuras de Assimp y carga de texturas (practicas 05 y 06).
+// Si una textura .webp o con ruta de Blender no carga, aqui se busca una alternativa (.png/.jpg).
+// ============================================================================================
 #ifndef MODELSTRUCTS_H
 #define MODELSTRUCTS_H
 

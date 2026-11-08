@@ -1,3 +1,10 @@
+// ============================================================================================
+// ANIMACION POR CUADROS CLAVE (practicas 09 y 10)
+// Cada AnimacionKF guarda poses (tiempo, posicion, giro, escala) y PoseAt() interpola entre ellas.
+// Para usar una en un objeto:  e.mov = MOV_KF;  e.kf = GuardarKF(KF_MiAnimacion(posicion));
+// Las que se disparan con un evento usan loop = false y e.kfInicio = tiempo del evento.
+// [AGREGAR] una animacion nueva: copia la plantilla KF_Plantilla() al final de este archivo.
+// ============================================================================================
 #ifndef KEYFRAMES_H
 #define KEYFRAMES_H
 /*
@@ -222,6 +229,20 @@ inline AnimacionKF KF_PezLoro(const glm::vec3& base)
         { 7.2f,  base + glm::vec3( 5.0f, 0.9f,  3.0f), 145.0f, glm::vec3(0.0f, 0.0f, -3.0f), 1.0f },
         { 9.6f,  base + glm::vec3( 2.0f, 0.3f, -3.0f), 225.0f, glm::vec3(0.0f), 1.0f },
         { 12.0f, base + glm::vec3(-8.0f, 0.0f,  2.0f), 360.0f, glm::vec3(0.0f), 1.0f },
+    };
+    return a;
+}
+
+// [AGREGAR] PLANTILLA DE UNA ANIMACION POR CUADROS CLAVE (copia y cambia el nombre y las poses):
+//   cada linea es { tiempo (s), posicion, giro en Y (grados), giro extra (X,Y,Z), escala }
+//   Uso en una zona:  Elemento e = Fijo(...);  e.mov = MOV_KF;  e.kf = GuardarKF(KF_Plantilla(glm::vec3(x, y, z)));
+inline AnimacionKF KF_Plantilla(const glm::vec3& base)
+{
+    AnimacionKF a; a.loop = true;              // loop = false: se reproduce una vez (se dispara con e.kfInicio)
+    a.keys = {
+        { 0.0f, base,                               0.0f,   glm::vec3(0.0f), 1.0f },
+        { 1.5f, base + glm::vec3(0.0f, 1.0f, 0.0f), 90.0f,  glm::vec3(0.0f), 1.2f },
+        { 3.0f, base,                               180.0f, glm::vec3(0.0f), 1.0f },
     };
     return a;
 }

@@ -1,3 +1,6 @@
+// ============================================================================================
+// ANIMACION ESQUELETICA / SKINNING (practicas 09 y 10): modelos con huesos (tortuga animada).
+// ============================================================================================
 #ifndef ANIMATEDMODEL_H
 #define ANIMATEDMODEL_H
 

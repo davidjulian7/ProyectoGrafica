@@ -1,3 +1,7 @@
+// ============================================================================================
+// ANIMACION DE PARTICULAS (practica 11): clase Particles de las practicas.
+// Las burbujas de las zonas se manejan en animacion/particulas_zona.h.
+// ============================================================================================
 #ifndef PARTICLES_H
 #define PARTICLES_H
 

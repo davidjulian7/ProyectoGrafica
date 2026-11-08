@@ -1,4 +1,7 @@
 #version 330 core
+// ============================================================================================
+// SUPERFICIE DEL AGUA VISTA DESDE ABAJO (practica 14: Fresnel) · ley de Snell y Fresnel-Schlick.
+// ============================================================================================
 // Superficie del agua vista desde abajo.
 // Refraccion agua -> aire con la ley de Snell: dentro del "cono de Snell" (~48.6 grados)
 // se ve el cielo; fuera de el hay reflexion total interna (se refleja el fondo, cubemap).

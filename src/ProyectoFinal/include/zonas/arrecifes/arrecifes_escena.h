@@ -1,6 +1,11 @@
 #ifndef ARRECIFES_ESCENA_H
 #define ARRECIFES_ESCENA_H
-// (cabecera)
+// ============================================================================================
+// ZONA 1 · ARRECIFES · Que objetos hay y donde estan (ConstruirArrecifes).
+// [CAMBIAR] luz, niebla y color del agua: bloque cfg.* al inicio de ConstruirArrecifes().
+// [CAMBIAR] posicion, tamano o velocidad de un animal: busca su nombre de archivo (ej. "tortuga").
+// [AGREGAR] un modelo: ver la plantilla marcada con [AGREGAR] al final de ConstruirArrecifes().
+// ============================================================================================
 
 inline void Escenario::AjustarArrecife()
 {
@@ -59,6 +64,9 @@ inline void Escenario::ConstruirArrecifes()
 {
     cfg = ZonaConfig();
     cfg.nombre = "Arrecifes";
+    // [CAMBIAR] AMBIENTE DE LA ZONA: niebla = color del agua (R,G,B de 0 a 1); densidad = que tan turbia (0.01 clara, 0.05 turbia);
+    //            solColor = color e intensidad del sol; solDir = direccion de la luz; ambArriba/ambAbajo = luz ambiental;
+    //            causticas = reflejos de luz en el fondo (0 a 1); superficieY = altura de la superficie; inicioCamara = donde aparece el buzo.
     cfg.niebla = glm::vec3(0.07f, 0.42f, 0.52f);
     cfg.densidad = 0.018f;
     cfg.solColor = glm::vec3(1.0f, 0.96f, 0.86f) * 1.35f;
@@ -212,6 +220,18 @@ inline void Escenario::ConstruirArrecifes()
 
     // 23 Burbujas: respiradero y grietas del arrecife
     fuentes = { glm::vec3(18.0f, 3.6f, -15.0f), glm::vec3(18.4f, 2.4f, -14.4f), glm::vec3(-6.0f, 0.4f, -4.0f) };
+
+    // [AGREGAR] UN MODELO NUEVO A ESTA ZONA (copia, quita las // y cambia los valores):
+    //   1) Pon el archivo .fbx (y su textura .jpg/.png) en bin/models/zonas/arrecifes/
+    //   2) Objeto quieto:
+    //        Elemento nuevo = Fijo("mi_modelo", "arrecifes", glm::vec3(x, 0.0f, z), giroY, escala);
+    //        nuevo.interactivo = true; nuevo.etiqueta = "Mi modelo";   // para que la mira lo seleccione
+    //        MatPlastico(nuevo);                                       // material: MatOpaco / MatPlastico / MatTraslucido / MatMetalico
+    //        elementos.push_back(nuevo);
+    //   3) Animal que nada en circulo:
+    //        Elemento pez = Nadador("mi_pez", "arrecifes", MOV_ORBITA, glm::vec3(x, altura, z), radio, velocidad, "Mi pez");
+    //        elementos.push_back(pez);
+    //   4) (opcional) su ficha educativa en interfaz/fichas.h
 }
 
 #endif

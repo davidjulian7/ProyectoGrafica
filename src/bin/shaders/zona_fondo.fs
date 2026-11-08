@@ -1,4 +1,7 @@
 #version 330 core
+// ============================================================================================
+// AGUA DE FONDO (practicas 06 y 10: en lugar de un cubemap fijo se calcula el color segun la direccion de la mirada).
+// ============================================================================================
 // Agua de fondo: color segun la direccion de la mirada, brillo del sol y rayos de luz.
 out vec4 FragColor;
 

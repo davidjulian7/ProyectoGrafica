@@ -1,6 +1,10 @@
 #ifndef RENDER_H
 #define RENDER_H
-// (cabecera)
+// ============================================================================================
+// ESCENA · Render (practicas 01 y 02): orden en que se dibuja cada cuadro.
+//   1) agua de fondo   2) terreno   3) objetos opacos   4) superficie del agua   5) transparentes y burbujas
+// [CAMBIAR] el orden o agregar un pase nuevo (por ejemplo un objeto con otro shader) dentro de Dibujar().
+// ============================================================================================
 
 inline void Escenario::Dibujar(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, int fbW, int fbH, const Camera* camBuzo, bool mostrarBuzo)
 {

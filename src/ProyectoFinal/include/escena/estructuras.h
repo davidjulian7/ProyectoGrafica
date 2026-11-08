@@ -1,3 +1,9 @@
+// ============================================================================================
+// ESCENA · Datos de cada objeto (struct Elemento) y de cada zona (struct ZonaConfig).
+// Cada campo de Elemento es algo que puedes cambiarle a un objeto donde se crea, por ejemplo:
+//   e.escala = 2.0f;  e.yaw = 90;  e.tinte = glm::vec3(1, 0.5, 0.5);  e.alpha = 0.6f;  e.emision = 0.3f;
+//   e.vel = 0.3f (rapidez de nado);  e.interactivo = true;  e.etiqueta = "Nombre";
+// ============================================================================================
 #ifndef ESTRUCTURAS_H
 #define ESTRUCTURAS_H
 // Datos de la escena: tipos de movimiento, propiedades de cada objeto (Elemento) y configuracion de una zona.

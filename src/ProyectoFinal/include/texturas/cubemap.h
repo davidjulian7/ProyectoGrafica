@@ -1,3 +1,8 @@
+// ============================================================================================
+// TEXTURAS · Cubemap (practicas 06 y 10): seis caras que rodean la escena.
+// Se usa como reflejo del fondo en la superficie del agua. Imagenes en bin/textures/cubemap/submarino/.
+// [CAMBIAR] el cubemap: reemplaza las 6 imagenes de esa carpeta (mismo nombre y tamano).
+// ============================================================================================
 #ifndef CUBEMAP_H
 #define CUBEMAP_H
 

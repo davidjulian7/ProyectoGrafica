@@ -1,3 +1,7 @@
+// ============================================================================================
+// INTERFAZ · Menu de inicio y HUD (texto, rectangulos, imagenes, ficha bajo la mira).
+// [CAMBIAR] textos del menu y de las tarjetas: busca "Elige tu" o el nombre de la zona.
+// ============================================================================================
 #ifndef MENU_H
 #define MENU_H
 /*

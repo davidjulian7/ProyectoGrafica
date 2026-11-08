@@ -1,6 +1,9 @@
 #ifndef PARTICULAS_ZONA_H
 #define PARTICULAS_ZONA_H
-// (cabecera)
+// ============================================================================================
+// ANIMACION DE PARTICULAS (practica 11): burbujas del buzo, fugas de burbujas y monedas del cofre.
+// Actualizar() se ejecuta cada cuadro: mueve las burbujas hacia arriba y aplica gravedad a las monedas.
+// ============================================================================================
 
 inline bool Escenario::Actualizar(float dt, float t, const Camera& cam)
 {
@@ -26,6 +29,7 @@ inline bool Escenario::Actualizar(float dt, float t, const Camera& cam)
     }
     // respiracion del buzo: cada 4.5 s sale una nube de burbujas frente a la mascara
     respiracion += dt;
+    // [CAMBIAR] cada cuantos segundos exhala burbujas el buzo (4.5)
     if (respiracion > 4.5f) {
         respiracion = 0.0f;
         exhalo = true;
@@ -40,6 +44,7 @@ inline bool Escenario::Actualizar(float dt, float t, const Camera& cam)
     }
     // fuentes de burbujas de la zona (corales, fugas del submarino)
     fuenteTiempo += dt;
+    // [CAMBIAR] frecuencia de las fugas de burbujas (segundos entre burbujas)
     if (fuenteTiempo > 0.25f) {
         fuenteTiempo = 0.0f;
         for (size_t f = 0; f < fuentes.size(); f++) {

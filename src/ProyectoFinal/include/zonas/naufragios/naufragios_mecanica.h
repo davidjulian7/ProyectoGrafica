@@ -1,3 +1,8 @@
+// ============================================================================================
+// ZONA 3 · NAUFRAGIOS · Reglas: limpieza del agua, pez leon, red fantasma, dron guia, cofre y monedas.
+// [CAMBIAR] color y transparencia del agua cuando el fondo ya esta limpio (segundo valor de cada mix)
+// [CAMBIAR] el color del agua limpia: en Actualizar(), las lineas esc.cfg.niebla = glm::mix(...).
+// ============================================================================================
 #ifndef NAUFRAGIOS_H
 #define NAUFRAGIOS_H
 /*

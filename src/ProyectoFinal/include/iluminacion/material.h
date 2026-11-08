@@ -1,3 +1,7 @@
+// ============================================================================================
+// ILUMINACION (practicas 07 y 08) · Clase Material de las practicas (ambiente, difusa, especular).
+// Los materiales de las zonas (opaco, plastico, traslucido, metalico) estan en iluminacion/luces_y_materiales.h.
+// ============================================================================================
 #ifndef MATERIAL_H
 #define MATERIAL_H
 

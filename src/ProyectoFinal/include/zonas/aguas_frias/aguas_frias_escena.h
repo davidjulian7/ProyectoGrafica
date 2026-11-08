@@ -1,11 +1,18 @@
 #ifndef AGUAS_FRIAS_ESCENA_H
 #define AGUAS_FRIAS_ESCENA_H
-// (cabecera)
+// ============================================================================================
+// ZONA 2 · AGUAS FRIAS · Que objetos hay y donde estan (ConstruirAguasFrias).
+// [CAMBIAR] luz, niebla y color del agua: bloque cfg.* al inicio de ConstruirAguasFrias().
+// [AGREGAR] un modelo: copia una linea Fijo(...) o Nadador(...) existente y cambia archivo y posicion.
+// ============================================================================================
 
 inline void Escenario::ConstruirAguasFrias()
 {
     cfg = ZonaConfig();
     cfg.nombre = "Aguas Frias";
+    // [CAMBIAR] AMBIENTE DE LA ZONA: niebla = color del agua (R,G,B de 0 a 1); densidad = que tan turbia (0.01 clara, 0.05 turbia);
+    //            solColor = color e intensidad del sol; solDir = direccion de la luz; ambArriba/ambAbajo = luz ambiental;
+    //            causticas = reflejos de luz en el fondo (0 a 1); superficieY = altura de la superficie; inicioCamara = donde aparece el buzo.
     cfg.niebla = glm::vec3(0.20f, 0.34f, 0.44f);
     cfg.densidad = 0.028f;
     cfg.solColor = glm::vec3(0.85f, 0.93f, 1.0f) * 0.95f;

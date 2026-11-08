@@ -1,3 +1,9 @@
+// ============================================================================================
+// INTERFAZ · Fichas educativas que aparecen al apuntar a un objeto.
+// La clave del mapa es la ETIQUETA del objeto (e.etiqueta en zonas/<zona>/<zona>_escena.h).
+// [AGREGAR] una ficha: copia una linea { "Etiqueta", { "Nombre", "CATEGORIA", "Estado", "Dato", true } },
+//   el ultimo valor (true/false) indica si cuenta en la bitacora de especies.
+// ============================================================================================
 #ifndef FICHAS_H
 #define FICHAS_H
 /*

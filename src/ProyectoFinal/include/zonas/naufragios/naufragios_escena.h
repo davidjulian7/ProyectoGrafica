@@ -23,6 +23,17 @@ inline void Escenario::ConstruirNaufragios()
     cfg.superficieY = 22.0f;
     cfg.linterna = true;
     cfg.inicioCamara = glm::vec3(0.0f, 5.0f, 22.0f);
+
+    // [CAMBIAR] NADO, CAMARA Y FAUNA DE ESTA ZONA (solo afectan a esta zona)
+    cfg.nadoAceleracion = 3.5f;   // rapidez del buzo (velocidad maxima ~ aceleracion / resistencia)
+    cfg.nadoResistencia = 2.5f;   // resistencia del agua: mas alto = se detiene antes
+    cfg.campoVision = 45.0f;      // campo de vision en grados (45 normal, 60 gran angular)
+    cfg.velFauna = 0.5f;          // velocidad de los animales (1.0 normal, 0.5 mitad, 2.0 doble)
+    // [CAMBIAR] MATERIALES DE ESTA ZONA: glm::vec2(intensidad del brillo, concentracion del brillo)
+    cfg.matOpaco = glm::vec2(0.08f, 24.0f);        // roca, madera, arena
+    cfg.matPlastico = glm::vec2(0.60f, 32.0f);     // plasticos, caucho
+    cfg.matTraslucido = glm::vec2(0.30f, 64.0f);   // medusas, bolsas, botellas
+    cfg.matMetalico = glm::vec2(1.00f, 96.0f);     // latas, ancla, submarino, monedas
     terrenoArchivo = "terreno_naufragios"; terrenoCarpeta = "naufragios";
     const char* c = "naufragios";
     auto suelo = [&](float x, float z) { return AlturaSuelo(x, z); };
@@ -127,18 +138,18 @@ inline void Escenario::ConstruirNaufragios()
     barril.rotExtra = glm::vec3(8.0f, 0.0f, -12.0f); barril.basura = true; barril.residuo = 3; barril.peso = 5.0f; MatMetalico(barril);
     elementos.push_back(barril);
     Elemento nube = fijo("burbuja", glm::vec3(9.5f, 0.9f, 1.5f), 0, 3.2f, nullptr);
-    nube.carpeta = "comun"; nube.tinte = glm::vec3(0.45f, 1.0f, 0.35f); nube.alpha = 0.30f; nube.emision = 0.7f; nube.pulsar = true; nube.fantasma = 0.4f;
+    nube.carpeta = "naufragios"; nube.tinte = glm::vec3(0.45f, 1.0f, 0.35f); nube.alpha = 0.30f; nube.emision = 0.7f; nube.pulsar = true; nube.fantasma = 0.4f;
     elementos.push_back(nube);
 
     // 63 red de pesca fantasma con una tortuga atrapada
     Elemento red = fijo("red_fantasma", glm::vec3(-3.5f, -0.2f, -13.0f), 15, 1.0f, "Red fantasma");
     red.residuo = 4; red.peso = 6.0f; MatOpaco(red); elementos.push_back(red);
-    Elemento tortuga = Fijo("tortuga", "arrecifes", glm::vec3(-3.5f, 1.7f, -13.0f), 15, 1.0f);
+    Elemento tortuga = Fijo("tortuga", "naufragios", glm::vec3(-3.5f, 1.7f, -13.0f), 15, 1.0f);
     tortuga.interactivo = true; tortuga.etiqueta = "Tortuga atrapada"; elementos.push_back(tortuga);
 
     // ---------------- 67/68 cangrejos ermitanos (el de la lata cambia de concha al limpiar)
     Elemento cLata = fijo("cangrejo_lata", glm::vec3(4.0f, 0.12f, 7.5f), 200, 1.0f, "Cangrejo con lata"); MatMetalico(cLata); cLata.specInt = 0.6f; elementos.push_back(cLata);
-    Elemento cNat = Fijo("cangrejoermitano", "arrecifes", glm::vec3(4.0f, 0.15f, 7.5f), 200, 1.0f); cNat.interactivo = true; cNat.etiqueta = "Cangrejo ermitano"; cNat.visible = false;
+    Elemento cNat = Fijo("cangrejoermitano", "naufragios", glm::vec3(4.0f, 0.15f, 7.5f), 200, 1.0f); cNat.interactivo = true; cNat.etiqueta = "Cangrejo ermitano"; cNat.visible = false;
     elementos.push_back(cNat);
     cNat.pos = glm::vec3(-10.5f, 0.15f, -1.0f); cNat.yaw = 40; cNat.visible = true; elementos.push_back(cNat);
 

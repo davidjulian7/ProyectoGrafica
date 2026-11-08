@@ -175,6 +175,24 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\include\LEEME_ESTRUCTURA.md" />
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\objetos.vs" />
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\objetos.fs" />
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\fondo.vs" />
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\fondo.fs" />
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\superficie.vs" />
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\superficie.fs" />
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\objetos.vs" />
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\objetos.fs" />
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\fondo.vs" />
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\fondo.fs" />
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\superficie.vs" />
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\superficie.fs" />
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\objetos.vs" />
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\objetos.fs" />
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\fondo.vs" />
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\fondo.fs" />
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\superficie.vs" />
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\superficie.fs" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\ProyectoFinal.cpp" />

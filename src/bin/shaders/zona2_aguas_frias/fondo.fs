@@ -1,5 +1,9 @@
 #version 330 core
 // ============================================================================================
+// ZONA 2 · AGUAS FRIAS · este shader SOLO lo usa esta zona: cambiarlo no afecta a las otras zonas.
+// (las otras zonas tienen su propia copia en shaders/zona1_arrecifes, zona2_aguas_frias y zona3_naufragios)
+// ============================================================================================
+// ============================================================================================
 // AGUA DE FONDO (practicas 06 y 10: en lugar de un cubemap fijo se calcula el color segun la direccion de la mirada).
 // ============================================================================================
 // Agua de fondo: color segun la direccion de la mirada, brillo del sol y rayos de luz.

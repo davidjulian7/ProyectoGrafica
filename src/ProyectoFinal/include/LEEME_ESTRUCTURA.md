@@ -3,6 +3,21 @@
 Cada carpeta corresponde a un tema del curso. En Visual Studio aparecen con el número de la práctica.
 **Truco:** `Ctrl + Shift + F` y busca **`[CAMBIAR]`** o **`[AGREGAR]`**: son los puntos preparados para modificar.
 
+## Cada zona es independiente
+
+Todo lo que se ve y se siente en una zona está en **su** carpeta. Si cambias algo ahí, **no afecta a las otras zonas**:
+
+| Qué | Zona 1 · Arrecifes | Zona 2 · Aguas Frías | Zona 3 · Naufragios |
+|---|---|---|---|
+| Objetos, luz, niebla, nado, cámara, velocidad de animales y materiales | `include/zonas/arrecifes/arrecifes_escena.h` | `include/zonas/aguas_frias/aguas_frias_escena.h` | `include/zonas/naufragios/naufragios_escena.h` |
+| Reglas del juego y HUD | `arrecifes_mecanica.h` | `aguas_frias_mecanica.h` | `naufragios_mecanica.h` |
+| Shaders (luces, Phong, linterna, niebla, ondulación, Fresnel) | `bin/shaders/zona1_arrecifes/` | `bin/shaders/zona2_aguas_frias/` | `bin/shaders/zona3_naufragios/` |
+| Modelos y texturas | `bin/models/zonas/arrecifes/` | `bin/models/zonas/aguas_frias/` | `bin/models/zonas/naufragios/` |
+
+En cada carpeta de shaders: `objetos.vs/.fs` (los objetos), `fondo.vs/.fs` (el agua del fondo) y `superficie.vs/.fs` (la superficie vista desde abajo).
+
+**Lo único común a todas las zonas** (cámbialo solo si te piden algo para todo el programa): `ProyectoFinal.cpp` (teclas, proyección, ventana), `camara/camera.h` (sensibilidad del ratón), el menú (`interfaz/`) y el código de `escena/`, `animacion/`, `interaccion/` e `iluminacion/` (cómo se calcula, no los valores).
+
 ```
 src/ProyectoFinal/
 ├── ProyectoFinal.cpp ............ ventana, bucle principal, menú ↔ zonas, teclado y ratón
@@ -19,7 +34,7 @@ src/ProyectoFinal/
         ├── arrecifes/    arrecifes_escena.h (qué hay) · arrecifes_mecanica.h (reglas del juego)
         ├── aguas_frias/  aguas_frias_escena.h · aguas_frias_mecanica.h
         └── naufragios/   naufragios_escena.h · naufragios_mecanica.h
-src/bin/shaders/   zona.vs (movimiento de vértices) · zona.fs (luces, niebla, materiales) · zona_superficie.fs (Fresnel)
+src/bin/shaders/<zona>/   objetos.vs (movimiento de vértices) · objetos.fs (luces, niebla, materiales) · superficie.fs (Fresnel)
 src/bin/models/zonas/<zona>/   modelos .fbx y sus texturas
 ```
 
@@ -28,26 +43,26 @@ src/bin/models/zonas/<zona>/   modelos .fbx y sus texturas
 | Te piden… | Archivo | Qué buscar / cambiar |
 |---|---|---|
 | **Cámara más rápida o lenta (ratón)** | `camara/camera.h` | `SENSITIVITY` |
-| **Campo de visión (zoom)** | `camara/camera.h` | `ZOOM` (45 normal) |
-| **Velocidad de nado del buzo** | `ProyectoFinal.cpp` | `DIVER_ACCEL`, `DIVER_DRAG` |
+| **Campo de visión (zoom)** | `zonas/<zona>/<zona>_escena.h` | `cfg.campoVision` (45 normal) |
+| **Velocidad de nado del buzo** | `zonas/<zona>/<zona>_escena.h` | `cfg.nadoAceleracion`, `cfg.nadoResistencia` |
 | **Perspectiva: near / far** | `ProyectoFinal.cpp` | `glm::perspective(...)` → `0.1f` y `400.0f` |
 | **Proyección ortográfica** | `ProyectoFinal.cpp` | `glm::ortho(...)` (tecla 5) |
 | **Tamaño de ventana / viewport** | `ProyectoFinal.cpp` | `SCR_WIDTH`, `SCR_HEIGHT` |
 | **Modo líneas / puntos** | `ProyectoFinal.cpp` | teclas `M`, `N`, `B` (`glPolygonMode`) |
 | **Color o intensidad del sol, luz ambiental** | `zonas/<zona>/<zona>_escena.h` | bloque `cfg.solColor`, `cfg.ambArriba`… |
 | **Color del agua / niebla más o menos densa** | `zonas/<zona>/<zona>_escena.h` | `cfg.niebla`, `cfg.densidad` |
-| **Linterna (luz tipo reflector)** | `bin/shaders/zona.fs` | `smoothstep(0.80, 0.95` = apertura; color en la misma sección |
-| **Brillo especular / Phong** | `bin/shaders/zona.fs` | `float spec = pow(...)` |
+| **Linterna (luz tipo reflector)** | `bin/shaders/<zona>/objetos.fs` | `smoothstep(0.80, 0.95` = apertura; color en la misma sección |
+| **Brillo especular / Phong** | `bin/shaders/<zona>/objetos.fs` | `float spec = pow(...)` |
 | **Material de un objeto** | `zonas/<zona>/<zona>_escena.h` | `MatOpaco(e)`, `MatPlastico(e)`, `MatTraslucido(e)`, `MatMetalico(e)` |
-| **Valores de cada material** | `iluminacion/luces_y_materiales.h` | `MatOpaco` … `MatMetalico` (`specInt`, `specPower`, `metalico`) |
-| **Transparencia / Fresnel** | objeto: `e.alpha`, `e.fantasma` · superficie: `bin/shaders/zona_superficie.fs` | |
+| **Valores de cada material** | `zonas/<zona>/<zona>_escena.h` | `cfg.matOpaco`, `cfg.matPlastico`, `cfg.matTraslucido`, `cfg.matMetalico` |
+| **Transparencia / Fresnel** | objeto: `e.alpha`, `e.fantasma` · superficie: `bin/shaders/<zona>/superficie.fs` | |
 | **Cambiar una textura** | `bin/models/zonas/<zona>/` | reemplaza el `.jpg` con el mismo nombre · o tiñe con `e.tinte` |
 | **Mover / girar / escalar un objeto** | `zonas/<zona>/<zona>_escena.h` | en su línea `Fijo(...)`: posición, giro Y, escala · o en vivo con la tecla **E** |
 | **Agregar un modelo** | `zonas/<zona>/<zona>_escena.h` | plantilla `[AGREGAR]` al final de `ConstruirArrecifes()` |
-| **Velocidad de los animales** | `escena/escenario.h` | `velFauna` (todos) · `.vel` de cada animal en su zona |
+| **Velocidad de los animales** | `zonas/<zona>/<zona>_escena.h` | `cfg.velFauna` (todos los de la zona) · `.vel` de cada animal |
 | **Tipo de movimiento de un animal** | su zona | `MOV_ORBITA`, `MOV_CARDUMEN`, `MOV_LIBRE`, `MOV_FIJO`, `MOV_KF` (ver `escena/estructuras.h`) |
 | **Agregar animación por cuadros clave** | `animacion/keyframes.h` | plantilla `KF_Plantilla` al final |
-| **Ondulación al nadar (procedural)** | `bin/shaders/zona.vs` | `float onda = ...` |
+| **Ondulación al nadar (procedural)** | `bin/shaders/<zona>/objetos.vs` | `float onda = ...` |
 | **Burbujas (partículas)** | `animacion/particulas_zona.h` | `respiracion`, `fuenteTiempo` |
 | **Selección con la mira (picking)** | `interaccion/picking.h` | `R` = área de puntería; un objeto se selecciona si `e.interactivo = true` |
 | **Agregar una tecla** | `ProyectoFinal.cpp` | plantilla `[AGREGAR]` dentro de `key_callback` |

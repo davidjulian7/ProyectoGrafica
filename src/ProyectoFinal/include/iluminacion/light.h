@@ -1,6 +1,6 @@
 // ============================================================================================
 // ILUMINACION (practicas 07 y 08) · Clase Light de las practicas (posicion, color, potencia).
-// Las zonas usan su propio modelo de luz: ver iluminacion/luces_y_materiales.h y bin/shaders/zona.fs.
+// Las zonas usan su propio modelo de luz: ver iluminacion/luces_y_materiales.h y bin/shaders/<zona>/objetos.fs.
 // ============================================================================================
 #ifndef LIGHT_H
 #define LIGHT_H

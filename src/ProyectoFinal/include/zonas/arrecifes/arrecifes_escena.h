@@ -76,6 +76,17 @@ inline void Escenario::ConstruirArrecifes()
     cfg.causticas = 1.0f;
     cfg.superficieY = 14.0f;                       // arrecife somero, lleno de luz
     cfg.inicioCamara = glm::vec3(0.0f, 8.0f, 20.0f);
+
+    // [CAMBIAR] NADO, CAMARA Y FAUNA DE ESTA ZONA (solo afectan a esta zona)
+    cfg.nadoAceleracion = 3.5f;   // rapidez del buzo (velocidad maxima ~ aceleracion / resistencia)
+    cfg.nadoResistencia = 2.5f;   // resistencia del agua: mas alto = se detiene antes
+    cfg.campoVision = 45.0f;      // campo de vision en grados (45 normal, 60 gran angular)
+    cfg.velFauna = 0.5f;          // velocidad de los animales (1.0 normal, 0.5 mitad, 2.0 doble)
+    // [CAMBIAR] MATERIALES DE ESTA ZONA: glm::vec2(intensidad del brillo, concentracion del brillo)
+    cfg.matOpaco = glm::vec2(0.08f, 24.0f);        // roca, madera, arena
+    cfg.matPlastico = glm::vec2(0.60f, 32.0f);     // plasticos, caucho
+    cfg.matTraslucido = glm::vec2(0.30f, 64.0f);   // medusas, bolsas, botellas
+    cfg.matMetalico = glm::vec2(1.00f, 96.0f);     // latas, ancla, submarino, monedas
     terrenoArchivo = "terreno_arrecifes"; terrenoCarpeta = "arrecifes";
     const char* c = "arrecifes";
 
@@ -213,9 +224,9 @@ inline void Escenario::ConstruirArrecifes()
     Elemento delfines = Nadador("delfin", c, MOV_CARDUMEN, glm::vec3(0.0f, 10.5f, 0.0f), 24.0f, 0.22f, "Delfin nariz de botella");
     delfines.miembros = 3; delfines.dispersion = 2.0f; delfines.ondula = 0.12f; delfines.velNado = 5.0f; delfines.ondulaVertical = true;
     delfines.oscAmp = 1.2f; delfines.oscVel = 0.9f; elementos.push_back(delfines);
-    Elemento barracudas = Nadador("barracuda", "naufragios", MOV_CARDUMEN, glm::vec3(4.0f, 6.0f, 2.0f), 16.0f, -0.16f, "Barracuda");
+    Elemento barracudas = Nadador("barracuda", "arrecifes", MOV_CARDUMEN, glm::vec3(4.0f, 6.0f, 2.0f), 16.0f, -0.16f, "Barracuda");
     barracudas.miembros = 4; barracudas.dispersion = 1.5f; elementos.push_back(barracudas);
-    Elemento vaquita = Nadador("vacamarina", "naufragios", MOV_ORBITA, glm::vec3(6.0f, 3.5f, 10.0f), 9.0f, 0.16f, "Vaquita marina");
+    Elemento vaquita = Nadador("vacamarina", "arrecifes", MOV_ORBITA, glm::vec3(6.0f, 3.5f, 10.0f), 9.0f, 0.16f, "Vaquita marina");
     vaquita.ondula = 0.08f; vaquita.velNado = 4.0f; vaquita.sobreSuelo = true; vaquita.ondulaVertical = true; elementos.push_back(vaquita);
 
     // 23 Burbujas: respiradero y grietas del arrecife

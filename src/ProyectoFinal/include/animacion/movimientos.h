@@ -5,7 +5,7 @@
 // Matriz() arma la matriz de modelo de cada objeto en cada cuadro:  traslacion * rotacion * escala.
 // Segun e.mov el objeto: se queda fijo (MOV_FIJO), nada en circulo (MOV_ORBITA), en cardumen (MOV_CARDUMEN),
 // en forma de 8 (MOV_LIBRE), a la deriva (MOV_DERIVA), por cuadros clave (MOV_KF), etc.
-// [CAMBIAR] la velocidad de TODA la fauna: velFauna en escena/escenario.h.
+// [CAMBIAR] la velocidad de los animales de una zona: cfg.velFauna en zonas/<zona>/<zona>_escena.h.
 // [CAMBIAR] la velocidad de UN animal: su campo .vel donde se crea (zonas/<zona>/<zona>_escena.h).
 // ============================================================================================
 

@@ -1,5 +1,9 @@
 #version 330 core
 // ============================================================================================
+// ZONA 2 · AGUAS FRIAS · este shader SOLO lo usa esta zona: cambiarlo no afecta a las otras zonas.
+// (las otras zonas tienen su propia copia en shaders/zona1_arrecifes, zona2_aguas_frias y zona3_naufragios)
+// ============================================================================================
+// ============================================================================================
 // SUPERFICIE DEL AGUA VISTA DESDE ABAJO (practica 14: Fresnel) · ley de Snell y Fresnel-Schlick.
 // ============================================================================================
 // Superficie del agua vista desde abajo.

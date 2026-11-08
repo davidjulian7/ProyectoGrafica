@@ -1,5 +1,9 @@
 #version 330 core
 // ============================================================================================
+// ZONA 3 · NAUFRAGIOS · este shader SOLO lo usa esta zona: cambiarlo no afecta a las otras zonas.
+// (las otras zonas tienen su propia copia en shaders/zona1_arrecifes, zona2_aguas_frias y zona3_naufragios)
+// ============================================================================================
+// ============================================================================================
 // FRAGMENT SHADER DE LAS ZONAS (practicas 07, 08 y 14: Phong, varias luces, materiales y Fresnel)
 // Luces: sol (direccional, se absorbe con la profundidad), luz ambiental de hemisferio y linterna (reflector).
 // Despues: causticas, blanqueamiento del coral, brillo de borde (Fresnel) y niebla submarina.

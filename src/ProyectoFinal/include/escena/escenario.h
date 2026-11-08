@@ -28,8 +28,8 @@
 * Los modelos se exportan desde Blender con herramientas/exporta_zonas.py:
 * todos miran a +X, el lomo hacia +Y, y miden su tamano real en metros.
 *
-* Shaders: shaders/zona.vs/.fs (objetos), shaders/zona_fondo.fs (agua de fondo),
-*          shaders/zona_superficie.vs/.fs (superficie del agua vista desde abajo).
+* Shaders: cada zona tiene los suyos en shaders/zona1_arrecifes/, zona2_aguas_frias/ y zona3_naufragios/:
+*          objetos.vs/.fs (objetos), fondo.vs/.fs (agua de fondo), superficie.vs/.fs (superficie del agua).
 */
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -64,9 +64,16 @@ public:
     bool Init(unsigned int cubemapID)
     {
         cubo = cubemapID;
-        sh = new Shader("shaders/zona.vs", "shaders/zona.fs");
-        shFondo = new Shader("shaders/menu_fondo.vs", "shaders/zona_fondo.fs");
-        shSuperficie = new Shader("shaders/zona_superficie.vs", "shaders/zona_superficie.fs");
+        // cada zona compila SUS PROPIOS shaders (bin/shaders/zona1_arrecifes, zona2_aguas_frias, zona3_naufragios):
+        // cambiar el shader de una zona no afecta a las demas
+        const char* carpetasShader[] = { "", "zona1_arrecifes", "zona2_aguas_frias", "zona3_naufragios" };
+        for (int z = 1; z <= 3; z++) {
+            std::string d = std::string("shaders/") + carpetasShader[z] + "/";
+            shZona[z] = new Shader((d + "objetos.vs").c_str(), (d + "objetos.fs").c_str());
+            shFondoZona[z] = new Shader((d + "fondo.vs").c_str(), (d + "fondo.fs").c_str());
+            shSuperficieZona[z] = new Shader((d + "superficie.vs").c_str(), (d + "superficie.fs").c_str());
+        }
+        sh = shZona[1]; shFondo = shFondoZona[1]; shSuperficie = shSuperficieZona[1];
         shPicking = new Shader("shaders/15_picking.vs", "shaders/15_picking.fs");
         glGenVertexArrays(1, &vaoVacio);
         // cuadrado de 1x1 en el plano XZ para la superficie del agua
@@ -83,6 +90,7 @@ public:
     void Entrar(int z, Camera& cam)
     {
         zona = z;
+        sh = shZona[z]; shFondo = shFondoZona[z]; shSuperficie = shSuperficieZona[z];   // shaders propios de la zona
         elementos.clear(); burbujas.clear(); animaciones.clear(); monedasVuelo.clear(); seleccion = -1;
         // terreno primero: los elementos se colocan sobre el al construirse
         const char* terrenos[] = { "", "terreno_arrecifes", "terreno_aguas_frias", "terreno_naufragios" };
@@ -118,14 +126,15 @@ public:
             else e.pos.y += e.pieY;
         }
         if (z == 1) AjustarArrecife();
-        burbujaModelo = Cargar("burbuja", "comun");
+        burbujaModelo = Cargar("burbuja", carpetas[z]);   // cada zona tiene su copia (models/zonas/<zona>/burbuja.fbx)
         if (!buzoModelo) buzoModelo = new Model("models/buzo.fbx");
         cfgBase = cfg;
         for (auto& f : fuentes) f.y += AlturaSuelo(f.x, f.z);   // las fuentes se miden desde el fondo
         linterna = cfg.linterna;
 
         cam.Position = cfg.inicioCamara;
-        cam.Yaw = cfg.inicioYaw; cam.Pitch = -5.0f; cam.Zoom = ZOOM;
+        cam.Yaw = cfg.inicioYaw; cam.Pitch = -5.0f; cam.Zoom = cfg.campoVision;   // campo de vision de esta zona
+        velFauna = cfg.velFauna;                                                   // velocidad de los animales de esta zona
         cam.ProcessMouseMovement(0.0f, 0.0f);
     }
 
@@ -207,7 +216,8 @@ public:
     void DibujarInspeccion(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t);   // -> escena/render.h
 
 private:
-    Shader* sh = nullptr, * shFondo = nullptr, * shSuperficie = nullptr, * shPicking = nullptr;
+    Shader* sh = nullptr, * shFondo = nullptr, * shSuperficie = nullptr, * shPicking = nullptr;   // shaders de la zona activa
+    Shader* shZona[4] = {}, * shFondoZona[4] = {}, * shSuperficieZona[4] = {};               // [1..3] uno por zona
     GLuint vaoVacio = 0, vaoQuad = 0, vboQuad = 0, cubo = 0;
     std::map<std::string, Model*> cache;
     std::vector<Elemento> elementos;
@@ -226,7 +236,7 @@ private:
     static const int N = 111;
     float respiracion = 3.0f, fuenteTiempo = 0.0f;
 public:
-    // [CAMBIAR] velocidad de TODOS los animales (1.0 = normal, 0.5 = mitad, 2.0 = doble)
+    // velocidad de los animales de la zona activa: se toma de cfg.velFauna (zonas/<zona>/<zona>_escena.h)
     float velFauna = 0.5f;             // multiplica la velocidad de nado de toda la fauna (mas lento = mas facil de observar)
     glm::vec3 buzoVel = glm::vec3(0.0f);   // velocidad del buzo (anima el modelo y el vaiven)
     bool buzoDePie = false;            // el buzo camina sobre el hielo (cuerpo vertical)

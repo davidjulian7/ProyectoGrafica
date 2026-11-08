@@ -14,6 +14,9 @@
     <Filter Include="9 Zonas\Zona 2 Aguas Frias"><UniqueIdentifier>{ce40e065-cf23-5898-8f0f-08da81a748d0}</UniqueIdentifier></Filter>
     <Filter Include="9 Zonas\Zona 3 Naufragios"><UniqueIdentifier>{c100fb2e-d635-598e-a095-6e62898bc261}</UniqueIdentifier></Filter>
     <Filter Include="Programa principal"><UniqueIdentifier>{1e69cfdd-3462-5501-941e-b6215bb2952b}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas\Zona 1 Arrecifes\shaders"><UniqueIdentifier>{c8ee554b-3bde-5d4d-b435-172e7749f48e}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas\Zona 2 Aguas Frias\shaders"><UniqueIdentifier>{d2037a35-34a3-5ccf-aa73-837edcc18129}</UniqueIdentifier></Filter>
+    <Filter Include="9 Zonas\Zona 3 Naufragios\shaders"><UniqueIdentifier>{8da89f51-df9f-56f8-a568-a112d1c114bd}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\ProyectoFinal.cpp"><Filter>Programa principal</Filter></ClCompile>
@@ -54,5 +57,23 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\include\LEEME_ESTRUCTURA.md"><Filter>Programa principal</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\objetos.vs"><Filter>9 Zonas\Zona 1 Arrecifes\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\objetos.fs"><Filter>9 Zonas\Zona 1 Arrecifes\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\fondo.vs"><Filter>9 Zonas\Zona 1 Arrecifes\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\fondo.fs"><Filter>9 Zonas\Zona 1 Arrecifes\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\superficie.vs"><Filter>9 Zonas\Zona 1 Arrecifes\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona1_arrecifes\superficie.fs"><Filter>9 Zonas\Zona 1 Arrecifes\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\objetos.vs"><Filter>9 Zonas\Zona 2 Aguas Frias\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\objetos.fs"><Filter>9 Zonas\Zona 2 Aguas Frias\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\fondo.vs"><Filter>9 Zonas\Zona 2 Aguas Frias\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\fondo.fs"><Filter>9 Zonas\Zona 2 Aguas Frias\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\superficie.vs"><Filter>9 Zonas\Zona 2 Aguas Frias\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona2_aguas_frias\superficie.fs"><Filter>9 Zonas\Zona 2 Aguas Frias\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\objetos.vs"><Filter>9 Zonas\Zona 3 Naufragios\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\objetos.fs"><Filter>9 Zonas\Zona 3 Naufragios\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\fondo.vs"><Filter>9 Zonas\Zona 3 Naufragios\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\fondo.fs"><Filter>9 Zonas\Zona 3 Naufragios\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\superficie.vs"><Filter>9 Zonas\Zona 3 Naufragios\shaders</Filter></None>
+    <None Include="..\..\..\bin\shaders\zona3_naufragios\superficie.fs"><Filter>9 Zonas\Zona 3 Naufragios\shaders</Filter></None>
   </ItemGroup>
 </Project>

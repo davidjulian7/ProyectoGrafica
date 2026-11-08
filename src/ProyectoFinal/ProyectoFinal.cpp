@@ -98,10 +98,8 @@ MecanicaAguasFrias aguasFrias; // mecánica de la Zona 2 (include/aguas_frias.h)
 
 // --- Buzo: nado con inercia (etapa 1) ---
 glm::vec3 diverVelocity(0.0f);
-// [CAMBIAR] NADO DEL BUZO: DIVER_ACCEL = que tan rapido acelera (velocidad maxima ~ ACCEL/DRAG);
-//            DIVER_DRAG = resistencia del agua (mas alto = se detiene antes). Shift multiplica por 2.
-const float DIVER_ACCEL = 3.5f;   // qué tan rápido arranca al aletear (velocidad máxima ~1.4 m/s)
-const float DIVER_DRAG  = 2.5f;   // resistencia del agua (frena al soltar las teclas)
+// NADO DEL BUZO: la aceleracion y la resistencia del agua son de CADA ZONA
+// (cfg.nadoAceleracion y cfg.nadoResistencia en zonas/<zona>/<zona>_escena.h). Shift multiplica por 2.
 
 // Tamaño en pixeles de la ventana
 // [CAMBIAR] tamano de la ventana en pixeles (practica 02: viewport)
@@ -563,8 +561,8 @@ void processInput(GLFWwindow* window)
 		}
 		else {
 			if (glm::length(wish) > 0.0f) wish = glm::normalize(wish);
-			diverVelocity += wish * DIVER_ACCEL * aleteo * deltaTime;
-			diverVelocity *= std::exp(-DIVER_DRAG * deltaTime);
+			diverVelocity += wish * escenario.cfg.nadoAceleracion * aleteo * deltaTime;
+			diverVelocity *= std::exp(-escenario.cfg.nadoResistencia * deltaTime);
 			camera.Position += diverVelocity * deltaTime;
 
 			// Límites: no atravesar el fondo, no salir del agua, no salir de la zona

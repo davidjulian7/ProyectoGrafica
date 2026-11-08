@@ -22,6 +22,17 @@ inline void Escenario::ConstruirAguasFrias()
     cfg.causticas = 0.3f;
     cfg.superficieY = 16.0f;
     cfg.inicioCamara = glm::vec3(0.0f, 8.0f, 24.0f);
+
+    // [CAMBIAR] NADO, CAMARA Y FAUNA DE ESTA ZONA (solo afectan a esta zona)
+    cfg.nadoAceleracion = 3.5f;   // rapidez del buzo (velocidad maxima ~ aceleracion / resistencia)
+    cfg.nadoResistencia = 2.5f;   // resistencia del agua: mas alto = se detiene antes
+    cfg.campoVision = 45.0f;      // campo de vision en grados (45 normal, 60 gran angular)
+    cfg.velFauna = 0.5f;          // velocidad de los animales (1.0 normal, 0.5 mitad, 2.0 doble)
+    // [CAMBIAR] MATERIALES DE ESTA ZONA: glm::vec2(intensidad del brillo, concentracion del brillo)
+    cfg.matOpaco = glm::vec2(0.08f, 24.0f);        // roca, madera, arena
+    cfg.matPlastico = glm::vec2(0.60f, 32.0f);     // plasticos, caucho
+    cfg.matTraslucido = glm::vec2(0.30f, 64.0f);   // medusas, bolsas, botellas
+    cfg.matMetalico = glm::vec2(1.00f, 96.0f);     // latas, ancla, submarino, monedas
     terrenoArchivo = "terreno_aguas_frias"; terrenoCarpeta = "aguas_frias";
     const char* c = "aguas_frias";
 
@@ -109,7 +120,7 @@ inline void Escenario::ConstruirAguasFrias()
     elementos.push_back(krill);
     Elemento bacalaos = Nadador("bacalao", c, MOV_CARDUMEN, glm::vec3(6.0f, 3.5f, 6.0f), 8.0f, -0.3f, "Bacalao");
     bacalaos.miembros = 9; bacalaos.dispersion = 1.6f; bacalaos.sobreSuelo = true; elementos.push_back(bacalaos);
-    Elemento pescados = Nadador("pescado", "arrecifes", MOV_CARDUMEN, glm::vec3(-10.0f, 5.0f, 8.0f), 6.0f, 0.3f, "Pescado");
+    Elemento pescados = Nadador("pescado", "aguas_frias", MOV_CARDUMEN, glm::vec3(-10.0f, 5.0f, 8.0f), 6.0f, 0.3f, "Pescado");
     pescados.miembros = 5; pescados.dispersion = 1.4f; elementos.push_back(pescados);
 
     // Orca2, Narwhal2, Cachalote2 y LeonMarino2 ya vienen con Y arriba (exporta_al_juego.py): sin rotExtra
@@ -128,7 +139,7 @@ inline void Escenario::ConstruirAguasFrias()
     Elemento leones = Nadador("LeonMarino2", c, MOV_CARDUMEN, glm::vec3(10.0f, 10.0f, 14.0f), 9.0f, 0.30f, "Leon marino");
     leones.miembros = 3; leones.dispersion = 1.8f; leones.ondula = 0.10f; leones.velNado = 6.0f; leones.oscAmp = 1.0f;
     elementos.push_back(leones);
-    Elemento dracoides = Nadador("pezdracoide", "arrecifes", MOV_CARDUMEN, glm::vec3(-2.0f, 4.0f, 14.0f), 6.0f, 0.35f, "Pez dracoide");
+    Elemento dracoides = Nadador("pezdracoide", "aguas_frias", MOV_CARDUMEN, glm::vec3(-2.0f, 4.0f, 14.0f), 6.0f, 0.35f, "Pez dracoide");
     dracoides.miembros = 6; dracoides.dispersion = 1.4f; dracoides.tinte = glm::vec3(0.75f, 0.9f, 1.1f);
     elementos.push_back(dracoides);
     fuentes.clear();

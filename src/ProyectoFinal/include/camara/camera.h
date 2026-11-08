@@ -28,7 +28,7 @@ const float PITCH       =  0.0f;
 const float SPEED       =  2.5f;
 // [CAMBIAR] SENSITIVITY: giro de la camara con el raton (mas alto = gira mas rapido).
 const float SENSITIVITY =  0.12f;   // giro del raton (antes 0.5: demasiado rapido)
-// [CAMBIAR] ZOOM: campo de vision en grados (45 normal, 60 gran angular, 30 telefoto).
+// ZOOM: valor inicial. El campo de vision de cada zona se cambia en cfg.campoVision (zonas/<zona>/<zona>_escena.h).
 const float ZOOM        =  45.0f;
 
 

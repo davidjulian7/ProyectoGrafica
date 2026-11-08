@@ -1,5 +1,9 @@
 #version 330 core
 // ============================================================================================
+// ZONA 1 · ARRECIFES · este shader SOLO lo usa esta zona: cambiarlo no afecta a las otras zonas.
+// (las otras zonas tienen su propia copia en shaders/zona1_arrecifes, zona2_aguas_frias y zona3_naufragios)
+// ============================================================================================
+// ============================================================================================
 // VERTEX SHADER DE LAS ZONAS (practicas 02, 09 y 10)
 // Transforma cada vertice (projection * view * model) y anima de forma procedural:
 //   - ondulacion del cuerpo al nadar (uOndula, uVelNado, uOndulaEje)

@@ -2,12 +2,12 @@
 #define LUCES_Y_MATERIALES_H
 // ============================================================================================
 // ILUMINACION Y MATERIALES (practicas 07, 08 y 14: Phong, varias luces, materiales y Fresnel)
-// Aqui se envian al shader de las zonas (bin/shaders/zona.fs):
+// Aqui se envian al shader de las zonas (bin/shaders/<zona>/objetos.fs):
 //   - ConfigurarShader(): luz del sol, luz ambiental, niebla, causticas y la LINTERNA del buzo.
 //   - Comunes(): datos de material de cada objeto (tinte, transparencia, brillo, emision).
 //   - MatOpaco / MatPlastico / MatTraslucido / MatMetalico: los 4 tipos de material.
 // Los valores de luz de cada zona (color del sol, niebla...) estan en zonas/<zona>/<zona>_escena.h (cfg.*).
-// La formula de Phong y Fresnel esta en bin/shaders/zona.fs.
+// La formula de Phong y Fresnel esta en bin/shaders/<zona>/objetos.fs.
 // ============================================================================================
 
 inline void Escenario::ConfigurarShader(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, const Camera* camBuzo)
@@ -26,7 +26,7 @@ inline void Escenario::ConfigurarShader(const glm::mat4& proj, const glm::mat4& 
     sh->setFloat("uCausticas", cfg.causticas);
     sh->setFloat("uSuperficieY", cfg.superficieY);
     sh->setFloat("uTiempo", t);
-    // [CAMBIAR] LINTERNA (luz puntual tipo reflector): su color, alcance y apertura estan en bin/shaders/zona.fs
+    // [CAMBIAR] LINTERNA (luz puntual tipo reflector): su color, alcance y apertura estan en bin/shaders/<zona>/objetos.fs
     sh->setInt("uLinterna", linterna ? 1 : 0);
     // La linterna sale siempre del buzo (1a persona), aunque se mire en órbita
     const Camera& luz = camBuzo ? *camBuzo : cam;
@@ -55,18 +55,19 @@ inline void Escenario::Comunes(const glm::vec3& tinte, float ondula, float largo
     sh->setFloat("uMetalico", 0.0f);
 }
 
-// [CAMBIAR] MATERIALES: specInt = intensidad del brillo, specPower = que tan concentrado es el brillo,
-//            metalico = 1 tine el brillo con el color del objeto (metal). Para aplicar uno: MatMetalico(e);
+// MATERIALES: los valores (intensidad y concentracion del brillo) son de CADA ZONA: cfg.matOpaco, cfg.matPlastico,
+// cfg.matTraslucido y cfg.matMetalico en zonas/<zona>/<zona>_escena.h. Para aplicar uno a un objeto: MatMetalico(e);
+// metalico = 1 tine el brillo con el color del objeto (metal).
 inline void Escenario::MatOpaco(Elemento& e)
-{ e.specInt = 0.08f; e.specPower = 24.0f; e.metalico = 0.0f; }
+{ e.specInt = cfg.matOpaco.x; e.specPower = cfg.matOpaco.y; e.metalico = 0.0f; }
 
 inline void Escenario::MatPlastico(Elemento& e)
-{ e.specInt = 0.60f; e.specPower = 32.0f; e.metalico = 0.0f; }
+{ e.specInt = cfg.matPlastico.x; e.specPower = cfg.matPlastico.y; e.metalico = 0.0f; }
 
 inline void Escenario::MatTraslucido(Elemento& e)
-{ e.specInt = 0.30f; e.specPower = 64.0f; e.metalico = 0.0f; if (e.alpha >= 1.0f) e.alpha = 0.75f; }
+{ e.specInt = cfg.matTraslucido.x; e.specPower = cfg.matTraslucido.y; e.metalico = 0.0f; if (e.alpha >= 1.0f) e.alpha = 0.75f; }
 
 inline void Escenario::MatMetalico(Elemento& e)
-{ e.specInt = 1.00f; e.specPower = 96.0f; e.metalico = 1.0f; }
+{ e.specInt = cfg.matMetalico.x; e.specPower = cfg.matMetalico.y; e.metalico = 1.0f; }
 
 #endif

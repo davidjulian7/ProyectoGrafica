@@ -100,6 +100,14 @@ struct ZonaConfig {
     bool linterna = false;
     glm::vec3 inicioCamara = glm::vec3(0.0f, 5.0f, 20.0f);
     float inicioYaw = -90.0f;
+    // propios de cada zona (se asignan en zonas/<zona>/<zona>_escena.h)
+    float nadoAceleracion = 3.5f;      // rapidez con la que acelera el buzo
+    float nadoResistencia = 2.5f;      // resistencia del agua (mas alto = se detiene antes)
+    float campoVision = 45.0f;         // grados de la camara (zoom)
+    float velFauna = 0.5f;             // velocidad de los animales (1 = normal)
+    // materiales: (intensidad del brillo, concentracion del brillo)
+    glm::vec2 matOpaco = glm::vec2(0.08f, 24.0f), matPlastico = glm::vec2(0.60f, 32.0f);
+    glm::vec2 matTraslucido = glm::vec2(0.30f, 64.0f), matMetalico = glm::vec2(1.00f, 96.0f);
 };
 
 struct Burbuja { glm::vec3 p; float vel; float r; float fase; };

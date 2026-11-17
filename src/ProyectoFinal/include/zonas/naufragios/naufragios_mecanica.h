@@ -258,6 +258,21 @@ public:
         return "";
     }
 
+    bool Terminado() const { return fase == 4; }   // cofre abierto: pasa al final del recorrido
+
+    // Indicaciones al entrar a la zona (tarjeta inicial)
+    IntroZona Intro() const
+    {
+        IntroZona in; in.titulo = "ZONA 3 · NAUFRAGIOS"; in.subtitulo = "Huella humana y contaminación";
+        in.historia = "Nuestra basura llega al fondo del mar. Limpia el naufragio: cada residuo que retires aclara el agua y devuelve la vida al fondo.";
+        in.objetivos = { "Recoge la basura del fondo (clic)", "Retira a los peces león, una especie invasora (clic)",
+                         "Mantén el clic sobre la red para liberar a la tortuga", "Retira el barril tóxico", "Al terminar, nada hasta el cofre del tesoro" };
+        in.controles = { "WASD nadar · Espacio / Ctrl subir y bajar · Shift aletear · Ratón mirar",
+                         "F linterna · I ficha · H ayuda · El dron señala la basura más cercana" };
+        in.color = glm::vec3(1.0f, 0.8f, 0.45f);
+        return in;
+    }
+
     void DibujarHUD(MenuInicio& ui, GLFWwindow* ventana, float t, float tiempoEnZona, const glm::mat4& proj, const glm::mat4& view)
     {
         ui.Comenzar(ventana);
@@ -301,48 +316,65 @@ public:
             ui.Rect(glm::vec4(x, y, w * (corte > 1.0f ? 1.0f : corte), 9 * s), glm::vec4(1.0f, 0.75f, 0.4f, 1.0f), 4 * s);
         }
 
-        // ---------------- limpieza del oceano (derecha)
-        float pw = 250 * s, ph = 236 * s, px = W - pw - 18 * s, py = 96 * s;
-        glm::vec3 cl = glm::mix(glm::vec3(0.75f, 0.6f, 0.35f), glm::vec3(0.4f, 0.95f, 1.0f), limpieza);
-        ui.Rect(glm::vec4(px, py, pw, ph), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14 * s);
-        ui.Texto("LIMPIEZA DEL OCÉANO", px + 16 * s, py + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        snprintf(b, sizeof(b), "%d%%", (int)(limpieza * 100.0f + 0.5f));
-        ui.Texto(b, px + pw - 16 * s, py + 30 * s, 24 * s, glm::vec4(cl, 1.0f), 2);
-        ui.Rect(glm::vec4(px + 16 * s, py + 40 * s, pw - 100 * s, 12 * s), glm::vec4(1, 1, 1, 0.15f), 6 * s);
-        ui.Rect(glm::vec4(px + 16 * s, py + 40 * s, (pw - 100 * s) * (limpieza < 0.02f ? 0.02f : limpieza), 12 * s), glm::vec4(cl, 1.0f), 6 * s);
-        const char* nom[] = { "", "Plásticos", "Metales", "Tóxicos" };
-        float yy = py + 68 * s;
-        for (int k = 1; k <= 3; k++) {
-            snprintf(b, sizeof(b), "%s", nom[k]); ui.Texto(b, px + 16 * s, yy, 14 * s, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), 0, false);
-            snprintf(b, sizeof(b), "%d / %d", recogidos[k], totales[k]);
-            ui.Texto(b, px + pw - 16 * s, yy, 14 * s, recogidos[k] == totales[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(1.0f), 2);
-            yy += 22 * s;
-        }
-        ui.Texto("Peces león retirados", px + 16 * s, yy, 14 * s, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), 0, false);
-        snprintf(b, sizeof(b), "%d / %d", leonesRetirados, leonesTotal);
-        ui.Texto(b, px + pw - 16 * s, yy, 14 * s, leonesRetirados == leonesTotal ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(1.0f, 0.8f, 0.45f, 1.0f), 2); yy += 22 * s;
-        ui.Texto("Tortuga liberada", px + 16 * s, yy, 14 * s, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), 0, false);
-        ui.Texto(tortugaLibre ? "Sí" : "No", px + pw - 16 * s, yy, 14 * s, tortugaLibre ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(1.0f, 0.6f, 0.5f, 1.0f), 2); yy += 22 * s;
-        snprintf(b, sizeof(b), "Especies registradas: %d de %d", (int)registradas.size(), totalEspecies);
-        ui.Texto(b, px + 16 * s, yy + 6 * s, 13 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- limpieza del oceano (derecha)
+            float pw = 250 * s, ph = 236 * s, px = W - pw - 18 * s, py = 96 * s;
+            glm::vec3 cl = glm::mix(glm::vec3(0.75f, 0.6f, 0.35f), glm::vec3(0.4f, 0.95f, 1.0f), limpieza);
+            ui.Rect(glm::vec4(px, py, pw, ph), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14 * s);
+            ui.Texto("LIMPIEZA DEL OCÉANO", px + 16 * s, py + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+            snprintf(b, sizeof(b), "%d%%", (int)(limpieza * 100.0f + 0.5f));
+            ui.Texto(b, px + pw - 16 * s, py + 30 * s, 24 * s, glm::vec4(cl, 1.0f), 2);
+            ui.Rect(glm::vec4(px + 16 * s, py + 40 * s, pw - 100 * s, 12 * s), glm::vec4(1, 1, 1, 0.15f), 6 * s);
+            ui.Rect(glm::vec4(px + 16 * s, py + 40 * s, (pw - 100 * s) * (limpieza < 0.02f ? 0.02f : limpieza), 12 * s), glm::vec4(cl, 1.0f), 6 * s);
+            const char* nom[] = { "", "Plásticos", "Metales", "Tóxicos" };
+            float yy = py + 68 * s;
+            for (int k = 1; k <= 3; k++) {
+                snprintf(b, sizeof(b), "%s", nom[k]); ui.Texto(b, px + 16 * s, yy, 14 * s, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), 0, false);
+                snprintf(b, sizeof(b), "%d / %d", recogidos[k], totales[k]);
+                ui.Texto(b, px + pw - 16 * s, yy, 14 * s, recogidos[k] == totales[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(1.0f), 2);
+                yy += 22 * s;
+            }
+            ui.Texto("Peces león retirados", px + 16 * s, yy, 14 * s, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), 0, false);
+            snprintf(b, sizeof(b), "%d / %d", leonesRetirados, leonesTotal);
+            ui.Texto(b, px + pw - 16 * s, yy, 14 * s, leonesRetirados == leonesTotal ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(1.0f, 0.8f, 0.45f, 1.0f), 2); yy += 22 * s;
+            ui.Texto("Tortuga liberada", px + 16 * s, yy, 14 * s, glm::vec4(0.9f, 0.95f, 1.0f, 1.0f), 0, false);
+            ui.Texto(tortugaLibre ? "Sí" : "No", px + pw - 16 * s, yy, 14 * s, tortugaLibre ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(1.0f, 0.6f, 0.5f, 1.0f), 2); yy += 22 * s;
+            snprintf(b, sizeof(b), "Especies registradas: %d de %d", (int)registradas.size(), totalEspecies);
+            ui.Texto(b, px + 16 * s, yy + 6 * s, 13 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
 
-        // ---------------- objetivos (abajo a la izquierda)
-        char objEsp[64]; snprintf(objEsp, sizeof(objEsp), "Registra las especies (%d/%d · L: lista)", (int)registradas.size(), totalEspecies);
-        bool hecho[6] = { limpiezaSinGrandes(), leonesRetirados >= leonesTotal, tortugaLibre, barrilRetirado, cofreAbierto, (int)registradas.size() >= totalEspecies };
-        const char* obj[6] = { "Recoge la basura del fondo", "Retira a los peces león", "Libera a la tortuga de la red", "Retira el barril tóxico", "Abre el cofre del tesoro", objEsp };
-        float bw = 310 * s, bh = 172 * s, bx = 18 * s, by = H - bh - 18 * s;
-        ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14 * s);
-        ui.Texto("OBJETIVOS", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        for (int k = 0; k < 6; k++) {
-            float y = by + 36 * s + k * 22 * s;
-            glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
-            ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, y - 2 * s, 16 * s, c, 1);
-            ui.Texto(obj[k], bx + 38 * s, y, 14 * s, c, 0, false);
         }
+        else {                    // pantalla limpia: version compacta
+            glm::vec3 cl = glm::mix(glm::vec3(0.75f, 0.6f, 0.35f), glm::vec3(0.4f, 0.95f, 1.0f), limpieza);
+            char ex[64]; snprintf(ex, sizeof(ex), "Peces león retirados %d/%d", leonesRetirados, leonesTotal);
+            HUDBarraCompacta(ui, "LIMPIEZA", limpieza, cl, ex);
+        }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- objetivos (abajo a la izquierda)
+            char objEsp[64]; snprintf(objEsp, sizeof(objEsp), "Registra las especies (%d/%d · L: lista)", (int)registradas.size(), totalEspecies);
+            bool hecho[6] = { limpiezaSinGrandes(), leonesRetirados >= leonesTotal, tortugaLibre, barrilRetirado, cofreAbierto, (int)registradas.size() >= totalEspecies };
+            const char* obj[6] = { "Recoge la basura del fondo", "Retira a los peces león", "Libera a la tortuga de la red", "Retira el barril tóxico", "Abre el cofre del tesoro", objEsp };
+            float bw = 310 * s, bh = 172 * s, bx = 18 * s, by = H - bh - 18 * s;
+            ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14 * s);
+            ui.Texto("OBJETIVOS", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+            for (int k = 0; k < 6; k++) {
+                float y = by + 36 * s + k * 22 * s;
+                glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
+                ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, y - 2 * s, 16 * s, c, 1);
+                ui.Texto(obj[k], bx + 38 * s, y, 14 * s, c, 0, false);
+            }
 
+        }
+        else {                    // pantalla limpia: version compacta
+            bool h[6] = { limpiezaSinGrandes(), leonesRetirados >= leonesTotal, tortugaLibre, barrilRetirado, cofreAbierto, (int)registradas.size() >= totalEspecies };
+            const char* txt[6] = { "Recoge la basura del fondo (clic)", "Retira a los peces león (clic)", "Mantén el clic sobre la red para liberar a la tortuga",
+                                   "Retira el barril tóxico (clic)", "Nada hasta el cofre del tesoro", "Registra las especies con la mira (L: lista)" };
+            int hechos = 0, actual = -1;
+            for (int k = 0; k < 6; k++) { if (h[k]) hechos++; else if (actual < 0) actual = k; }
+            HUDObjetivo(ui, actual < 0 ? "¡Objetivos completos!" : txt[actual], hechos, 6);
+        }
         // ---------------- avisos (arriba al centro)
         float ay = 92.0f * s;
-        for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < 2; i--, n++) {
+        for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < (HUD().detallado ? 2 : 1); i--, n++) {
             const AvisoHUD& a = avisos[i];
             float alfa = a.vida < 0.6f ? a.vida / 0.6f : (a.total - a.vida < 0.3f ? (a.total - a.vida) / 0.3f : 1.0f);
             std::vector<std::string> ls = ui.Lineas(a.texto, 430.0f * s, 16.0f * s, true);
@@ -355,19 +387,23 @@ public:
             ay += ah + 8 * s;
         }
 
-        // ---------------- ayuda de controles (primeros 20 s)
-        float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
-        if (ayuda > 0.0f) {
-            float x0 = bx + bw + 18 * s, x1 = W - 18 * s, aw = x1 - x0;
-            const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  F linterna  ·  V cámara  ·  Esc menú";
-            const char* l2 = "Clic: recoger basura y retirar peces león  ·  Clic sostenido: cortar la red  ·  El dron señala la basura más cercana";
-            std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
-            float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, y2 = H - 18 * s - ah;
-            ui.Rect(glm::vec4(x0, y2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
-            float y = y2 + 10 * s;
-            for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, y, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); y += lh; }
-            for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, y, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); y += lh; }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- ayuda de controles (primeros 20 s)
+            float bx = 18.0f * s, bw = 310.0f * s;   // posicion del panel de objetivos (la ayuda va a su derecha)
+            float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
+            if (ayuda > 0.0f) {
+                float x0 = bx + bw + 18 * s, x1 = W - 18 * s, aw = x1 - x0;
+                const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  F linterna  ·  V cámara  ·  Esc menú";
+                const char* l2 = "Clic: recoger basura y retirar peces león  ·  Clic sostenido: cortar la red  ·  El dron señala la basura más cercana";
+                std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
+                float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, y2 = H - 18 * s - ah;
+                ui.Rect(glm::vec4(x0, y2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
+                float y = y2 + 10 * s;
+                for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, y, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); y += lh; }
+                for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, y, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); y += lh; }
+            }
         }
+        HUDPistaTeclas(ui);
         if (verLista) HUDListaEspecies(ui, especiesLista, registradas);
         char r1[80], r2[80], r3[80];
         snprintf(r1, sizeof(r1), "Recogiste %d residuos y retiraste el barril tóxico", recogidos[1] + recogidos[2] + recogidos[3]);

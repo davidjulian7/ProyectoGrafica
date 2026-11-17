@@ -21,6 +21,7 @@
 */
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <interfaz/estado_hud.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>   // shader_m.h lo necesita
 #include <iostream>
@@ -297,10 +298,13 @@ public:
         const MenuTextura& t = hud[zona - 1];
         float w = menuMin(360.0f * escala, fbW * 0.45f);
         float h = w * (float)t.alto / menuMax(1.0f, (float)t.ancho);
-        DibujarImagen(t, glm::vec4(18.0f * escala, 18.0f * escala, w, h), 0.0f, 0.0f, glm::vec4(0.0f), 0.92f, 1.0f);
+        // [CAMBIAR] la insignia "ZONA N" se ve al llegar y se desvanece a los 6 s (con H se queda visible)
+        float insignia = HUD().detallado ? 1.0f : 1.0f - Suave((tiempoEnZona - 6.0f) / 1.5f);
+        if (insignia > 0.0f && !HUD().intro)
+            DibujarImagen(t, glm::vec4(18.0f * escala, (HUD().detallado ? 18.0f : 70.0f) * escala, w, h), 0.0f, 0.0f, glm::vec4(0.0f), 0.92f * insignia, 1.0f);
 
-        // ayuda de controles: visible los primeros 10 segundos en la zona
-        float ayuda = 1.0f - Suave((tiempoEnZona - 10.0f) / 1.5f);
+        // ayuda de controles: solo con la tecla H (las indicaciones ya se dieron al entrar)
+        float ayuda = HUD().detallado ? 1.0f : 0.0f;
         if (ayuda > 0.0f && controles.id && ayudaGenerica) {
             float cw = menuMin(fbW * 0.9f, 900.0f * escala);
             float ch = cw * (float)controles.alto / menuMax(1.0f, (float)controles.ancho);
@@ -343,9 +347,11 @@ public:
         DibujarColor(glm::vec4(cx - grosor * 0.5f, cy - sep - largo, grosor, largo), c, 0.0f, 1.0f);
         DibujarColor(glm::vec4(cx - grosor * 0.5f, cy + sep, grosor, largo), c, 0.0f, 1.0f);
 
+        if (hay && HUD().intro) hay = false;
         if (hay) {
             const Ficha* f = BuscarFicha(etiqueta);
-            if (f && negrita.tex.id) TarjetaFicha(*f, cx, cy + 30.0f * escala, detalle, colorDetalle);
+            if (f && negrita.tex.id && !HUD().fichaAbierta) EtiquetaCompacta(f->nombre, detalle, colorDetalle, cx, cy + 26.0f * escala);
+            else if (f && negrita.tex.id) TarjetaFicha(*f, cx, cy + 30.0f * escala, detalle, colorDetalle);
             else {
                 const MenuTextura& t = Etiqueta(etiqueta);
                 if (t.id) {
@@ -520,6 +526,18 @@ private:
     }
 
     // Tarjeta educativa bajo la mira
+    // Etiqueta pequena bajo la mira: nombre + accion disponible (la ficha completa se abre con I)
+    void EtiquetaCompacta(const std::string& nombre, const std::string& detalle, glm::vec3 colorDetalle, float cx, float y)
+    {
+        float s = escala;
+        float w1 = MedirTexto(nombre, 15.0f * s, true), w2 = detalle.empty() ? 0.0f : MedirTexto(detalle, 13.0f * s, false);
+        float w = (w1 > w2 ? w1 : w2) + 30.0f * s, h = detalle.empty() ? 30.0f * s : 50.0f * s;
+        DibujarColor(glm::vec4(cx - w * 0.5f, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.55f), 10.0f * s, 1.0f);
+        Texto(nombre, cx, y + 6.0f * s, 15.0f * s, glm::vec4(1.0f), 1);
+        if (!detalle.empty()) Texto(detalle, cx, y + 27.0f * s, 13.0f * s, glm::vec4(colorDetalle, 1.0f), 1, false);
+        Texto("I", cx + w * 0.5f + 8.0f * s, y + 7.0f * s, 12.0f * s, glm::vec4(0.8f, 0.9f, 1.0f, 0.5f), 0, false);
+    }
+
     void TarjetaFicha(const Ficha& f, float cx, float y, const std::string& detalle, glm::vec3 colorDetalle)
     {
         float s = escala, w = 470.0f * s, pad = 16.0f * s;

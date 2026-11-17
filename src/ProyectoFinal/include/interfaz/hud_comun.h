@@ -17,6 +17,7 @@
 #include <cmath>
 #include <interfaz/menu.h>
 #include <interfaz/fichas.h>
+#include <interfaz/estado_hud.h>
 
 // Ordena las etiquetas por el nombre que se muestra al usuario
 inline std::vector<std::string> OrdenarEspecies(const std::set<std::string>& etiquetas)
@@ -83,6 +84,111 @@ inline void HUDZonaCompletada(MenuInicio& ui, float segundos, const std::string&
     yy += 10 * s;
     for (const std::string& l : ls) { ui.Texto(l, W * 0.5f, yy, 15 * s, glm::vec4(1.0f, 0.9f, 0.65f, a), 1, false); yy += 20 * s; }
     ui.Texto("Esc: volver al menú   ·   o sigue explorando la zona", W * 0.5f, y + h - 28 * s, 13 * s, glm::vec4(0.75f, 0.85f, 0.9f, a), 1, false);
+}
+
+
+// ============================================================================================
+// PANTALLA LIMPIA: elementos compactos que se muestran mientras no se presione H
+// ============================================================================================
+
+// Indicaciones al entrar a una zona: historia corta, objetivos y controles
+struct IntroZona
+{
+    std::string titulo, subtitulo, historia;
+    std::vector<std::string> objetivos, controles;
+    glm::vec3 color = glm::vec3(0.45f, 0.85f, 1.0f);
+};
+
+inline void HUDIntro(MenuInicio& ui, const IntroZona& in, float segundos)
+{
+    float a = segundos < 0.5f ? segundos / 0.5f : 1.0f;
+    float s = ui.Escala(), W = ui.Ancho(), H = ui.Alto();
+    ui.Rect(glm::vec4(0, 0, W, H), glm::vec4(0.0f, 0.02f, 0.05f, 0.55f * a));
+    float w = 600.0f * s;
+    std::vector<std::string> hist = ui.Lineas(in.historia, w - 70.0f * s, 15.0f * s, false);
+    float h = 150.0f * s + hist.size() * 21.0f * s + in.objetivos.size() * 25.0f * s + in.controles.size() * 20.0f * s + 70.0f * s;
+    float x = (W - w) * 0.5f, y = (H - h) * 0.45f;
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.06f, 0.10f, 0.94f * a), 18.0f * s);
+    ui.Rect(glm::vec4(x, y, w, 5.0f * s), glm::vec4(in.color, a), 2.0f * s);
+    ui.Texto(in.titulo, W * 0.5f, y + 20 * s, 30 * s, glm::vec4(in.color, a), 1);
+    ui.Texto(in.subtitulo, W * 0.5f, y + 60 * s, 16 * s, glm::vec4(0.85f, 0.92f, 1.0f, a), 1, false);
+    float yy = y + 96 * s;
+    for (const std::string& l : hist) { ui.Texto(l, W * 0.5f, yy, 15 * s, glm::vec4(0.92f, 0.95f, 1.0f, a), 1, false); yy += 21 * s; }
+    yy += 12 * s;
+    ui.Texto("OBJETIVOS", x + 35 * s, yy, 13 * s, glm::vec4(in.color, a)); yy += 24 * s;
+    for (size_t i = 0; i < in.objetivos.size(); i++) {
+        char n[8]; snprintf(n, sizeof(n), "%d.", (int)i + 1);
+        ui.Texto(n, x + 40 * s, yy, 15 * s, glm::vec4(in.color, a), 0);
+        ui.Texto(in.objetivos[i], x + 62 * s, yy, 15 * s, glm::vec4(1.0f, 1.0f, 1.0f, a), 0, false);
+        yy += 25 * s;
+    }
+    yy += 10 * s;
+    for (const std::string& c : in.controles) { ui.Texto(c, W * 0.5f, yy, 13 * s, glm::vec4(0.75f, 0.85f, 0.92f, a), 1, false); yy += 20 * s; }
+    float pulso = 0.6f + 0.4f * sinf(segundos * 4.0f);
+    ui.Texto("Clic o Enter para comenzar", W * 0.5f, y + h - 38 * s, 17 * s, glm::vec4(1.0f, 0.85f, 0.45f, a * pulso), 1);
+}
+
+// Objetivo actual en una sola linea (arriba a la izquierda)
+inline void HUDObjetivo(MenuInicio& ui, const std::string& texto, int hechos, int total, const std::string& extra = std::string())
+{
+    float s = ui.Escala();
+    char b[32]; snprintf(b, sizeof(b), "%d/%d", hechos, total);
+    float tw = ui.MedirTexto(texto, 15.0f * s, true);
+    float w = tw + 96.0f * s, h = extra.empty() ? 38.0f * s : 58.0f * s, x = 18.0f * s, y = 18.0f * s;
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.62f), 12.0f * s);
+    ui.Texto(b, x + 14 * s, y + 10 * s, 15 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f), 0);
+    ui.Texto(texto, x + 62 * s, y + 10 * s, 15 * s, glm::vec4(1.0f), 0, true);
+    if (!extra.empty()) ui.Texto(extra, x + 62 * s, y + 34 * s, 12 * s, glm::vec4(0.75f, 0.88f, 0.95f, 0.95f), 0, false);
+}
+
+// Termometro compacto (derecha): barra delgada, temperatura y teclas
+inline void HUDTermometroCompacto(MenuInicio& ui, float temp, float tMin, float tMax, float marca, glm::vec3 color, const char* teclas)
+{
+    float s = ui.Escala(), W = ui.Ancho();
+    float w = 74.0f * s, h = 238.0f * s, x = W - w - 18.0f * s, y = 18.0f * s;
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.55f), 12.0f * s);
+    char b[32]; snprintf(b, sizeof(b), "%.1f°", temp);
+    ui.Texto(b, x + w * 0.5f, y + 10 * s, 19 * s, glm::vec4(color, 1.0f), 1);
+    float bx = x + w * 0.5f - 6 * s, by = y + 42 * s, bh = h - 78 * s;
+    float v = (temp - tMin) / (tMax - tMin); v = v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+    float vm = (marca - tMin) / (tMax - tMin);
+    ui.Rect(glm::vec4(bx, by, 12 * s, bh), glm::vec4(1, 1, 1, 0.15f), 6 * s);
+    ui.Rect(glm::vec4(bx, by + bh * (1.0f - v), 12 * s, bh * v), glm::vec4(color, 1.0f), 6 * s);
+    ui.Rect(glm::vec4(bx - 6 * s, by + bh * (1.0f - vm) - 1 * s, 24 * s, 2 * s), glm::vec4(1.0f, 0.75f, 0.4f, 1.0f));
+    ui.Texto(teclas, x + w * 0.5f, y + h - 28 * s, 12 * s, glm::vec4(0.8f, 0.9f, 1.0f, 0.9f), 1, false);
+}
+
+// Barra de progreso compacta (derecha)
+inline void HUDBarraCompacta(MenuInicio& ui, const char* titulo, float valor, glm::vec3 color, const std::string& extra = std::string())
+{
+    float s = ui.Escala(), W = ui.Ancho();
+    float w = 200.0f * s, h = extra.empty() ? 50.0f * s : 70.0f * s, x = W - w - 18.0f * s, y = 18.0f * s;
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.55f), 12.0f * s);
+    char b[16]; snprintf(b, sizeof(b), "%d%%", (int)(valor * 100.0f + 0.5f));
+    ui.Texto(titulo, x + 14 * s, y + 8 * s, 13 * s, glm::vec4(0.75f, 0.9f, 1.0f, 1.0f), 0);
+    ui.Texto(b, x + w - 14 * s, y + 6 * s, 16 * s, glm::vec4(color, 1.0f), 2);
+    ui.Rect(glm::vec4(x + 14 * s, y + 31 * s, w - 28 * s, 8 * s), glm::vec4(1, 1, 1, 0.15f), 4 * s);
+    ui.Rect(glm::vec4(x + 14 * s, y + 31 * s, (w - 28 * s) * (valor < 0.02f ? 0.02f : valor), 8 * s), glm::vec4(color, 1.0f), 4 * s);
+    if (!extra.empty()) ui.Texto(extra, x + 14 * s, y + 47 * s, 12 * s, glm::vec4(0.8f, 0.9f, 1.0f, 0.9f), 0, false);
+}
+
+// Aviso de que la zona termino: siguiente zona (abajo al centro)
+inline void HUDSiguienteZona(MenuInicio& ui, const std::string& texto, float restante, float t)
+{
+    float s = ui.Escala(), W = ui.Ancho(), H = ui.Alto();
+    char b[160]; snprintf(b, sizeof(b), "%s  ·  Enter para continuar (%d s)", texto.c_str(), (int)ceilf(restante > 0 ? restante : 0));
+    float w = ui.MedirTexto(b, 17.0f * s, true) + 50.0f * s, h = 46.0f * s, x = (W - w) * 0.5f, y = H - h - 26.0f * s;
+    float pulso = 0.35f + 0.25f * sinf(t * 4.0f);
+    ui.Resplandor(glm::vec4(x - 10 * s, y - 10 * s, w + 20 * s, h + 20 * s), glm::vec4(1.0f, 0.82f, 0.35f, pulso), 16 * s, 12 * s);
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.06f, 0.10f, 0.92f), 14.0f * s);
+    ui.Texto(b, W * 0.5f, y + 13 * s, 17 * s, glm::vec4(1.0f, 0.85f, 0.45f, 1.0f), 1);
+}
+
+// Pista discreta de teclas de informacion (abajo a la derecha)
+inline void HUDPistaTeclas(MenuInicio& ui)
+{
+    float s = ui.Escala(), W = ui.Ancho(), H = ui.Alto();
+    ui.Texto(HUD().detallado ? "H: ocultar ayuda" : "H: ayuda  ·  I: ficha", W - 18 * s, H - 30 * s, 12 * s, glm::vec4(0.8f, 0.9f, 1.0f, 0.55f), 2, false);
 }
 
 #endif

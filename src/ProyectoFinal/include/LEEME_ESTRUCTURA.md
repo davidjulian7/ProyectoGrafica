@@ -38,6 +38,13 @@ src/bin/shaders/<zona>/   objetos.vs (movimiento de vértices) · objetos.fs (lu
 src/bin/models/zonas/<zona>/   modelos .fbx y sus texturas
 ```
 
+## Recorrido, indicaciones y pantalla limpia
+
+- **Recorrido:** se elige una zona en el menú (Enter = Zona 1). Al completarla aparece "Siguiente zona…" y pasa sola a la siguiente (1 → 2 → 3 → pantalla final). Está en `ProyectoFinal.cpp`: `AvanzarRecorrido()`, `ESPERA_SIGUIENTE` (segundos de espera) y el bloque `zonaHecha` (qué significa "zona completada" en cada zona).
+- **Indicaciones al entrar:** cada zona tiene su tarjeta en `zonas/<zona>/<zona>_mecanica.h` → función `Intro()` (título, historia, objetivos y controles). Se dibujan con `HUDIntro` en `interfaz/hud_comun.h`.
+- **Pantalla limpia:** por defecto solo se ve el objetivo actual, el termómetro o barra compacta y un aviso. **H** muestra todos los paneles e **I** la ficha completa. El estado está en `interfaz/estado_hud.h` (`HUD().detallado`, `HUD().fichaAbierta`); las versiones compactas son `HUDObjetivo`, `HUDTermometroCompacto` y `HUDBarraCompacta` (`interfaz/hud_comun.h`), y la etiqueta bajo la mira es `EtiquetaCompacta` (`interfaz/menu.h`).
+- **Animación del buzo:** patada de piernas y aletas, brazos y respiración en `bin/shaders/<zona>/objetos.vs` (bloque `if (uBuzo == 1)`); la fase y la rapidez se mandan en `escena/render.h`.
+
 ## ¿Qué me pueden pedir y dónde lo cambio?
 
 | Te piden… | Archivo | Qué buscar / cambiar |
@@ -65,6 +72,9 @@ src/bin/models/zonas/<zona>/   modelos .fbx y sus texturas
 | **Ondulación al nadar (procedural)** | `bin/shaders/<zona>/objetos.vs` | `float onda = ...` |
 | **Burbujas (partículas)** | `animacion/particulas_zona.h` | `respiracion`, `fuenteTiempo` |
 | **Selección con la mira (picking)** | `interaccion/picking.h` | `R` = área de puntería; un objeto se selecciona si `e.interactivo = true` |
+| **Texto de las indicaciones de una zona** | `zonas/<zona>/<zona>_mecanica.h` | función `Intro()` |
+| **Tiempo para pasar a la siguiente zona** | `ProyectoFinal.cpp` | `ESPERA_SIGUIENTE` |
+| **Movimiento de piernas del buzo** | `bin/shaders/<zona>/objetos.vs` | `if (uBuzo == 1)`: amplitud `0.14 + 0.38` |
 | **Agregar una tecla** | `ProyectoFinal.cpp` | plantilla `[AGREGAR]` dentro de `key_callback` |
 | **Ficha educativa nueva** | `interfaz/fichas.h` | copia una línea del mapa (la clave es la `etiqueta` del objeto) |
 | **Temperaturas de la Zona 1 / 2** | `zonas/<zona>/<zona>_mecanica.h` | constantes `T_MIN`, `T_MAX`, `T_UMBRAL`… |

@@ -177,6 +177,19 @@ public:
         color = glm::vec3(0.5f, 1.0f, 0.6f); return "Estado: sano";
     }
 
+    // Indicaciones al entrar a la zona (tarjeta inicial)
+    IntroZona Intro() const
+    {
+        IntroZona in; in.titulo = "ZONA 1 · ARRECIFES"; in.subtitulo = "Estrés térmico y blanqueamiento del coral";
+        in.historia = "Los corales viven en equilibrio con algas que les dan color y alimento. Si el agua se calienta demasiado, las expulsan y se blanquean; si el calor sigue, mueren.";
+        in.objetivos = { "Sube la temperatura (↑) hasta blanquear el arrecife", "Enfría el agua (↓) o restaura con R para salvarlo",
+                         "Registra las especies apuntándoles con la mira (L: lista)" };
+        in.controles = { "WASD nadar · Espacio / Ctrl subir y bajar · Shift aletear · Ratón mirar",
+                         "Clic inspeccionar · I ficha del animal · H ayuda · Esc menú" };
+        in.color = glm::vec3(0.45f, 0.85f, 1.0f);
+        return in;
+    }
+
     void DibujarHUD(MenuInicio& ui, GLFWwindow* ventana, float t, float tiempoEnZona)
     {
         ui.Comenzar(ventana);
@@ -184,65 +197,81 @@ public:
         char b[96];
         glm::vec3 cTemp = ColorTemperatura(temperatura);
 
-        // ---------------- termometro (derecha)
-        float pw = 150.0f * s, ph = 430.0f * s, px = W - pw - 18.0f * s, py = 96.0f * s;
-        if (temperatura >= T_UMBRAL) ui.Resplandor(glm::vec4(px - 14 * s, py - 14 * s, pw + 28 * s, ph + 28 * s), glm::vec4(cTemp, 0.25f + 0.2f * sinf(t * 5.0f)), 18 * s, 14 * s);
-        ui.Rect(glm::vec4(px, py, pw, ph), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 16.0f * s);
-        ui.Texto("TEMPERATURA", px + pw * 0.5f, py + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f), 1);
-        snprintf(b, sizeof(b), "%.1f °C", temperatura);
-        ui.Texto(b, px + pw * 0.5f, py + 30 * s, 32 * s, glm::vec4(cTemp, 1.0f), 1);
-        float tx = px + pw * 0.40f, tw = 20.0f * s, ty = py + 88 * s, th = 250.0f * s;
-        ui.Rect(glm::vec4(tx - tw * 0.5f - 3 * s, ty - 3 * s, tw + 6 * s, th + 6 * s), glm::vec4(1, 1, 1, 0.30f), (tw + 6 * s) * 0.5f);
-        ui.Rect(glm::vec4(tx - tw * 0.5f, ty, tw, th), glm::vec4(0.03f, 0.10f, 0.15f, 0.95f), tw * 0.5f);
-        float frac = (temperatura - T_MIN) / (T_MAX - T_MIN);
-        float fh = th * frac;
-        ui.Rect(glm::vec4(tx - tw * 0.5f + 4 * s, ty + th - fh, tw - 8 * s, fh + 6 * s), glm::vec4(cTemp, 1.0f), (tw - 8 * s) * 0.5f);
-        float br = 21.0f * s;
-        ui.Rect(glm::vec4(tx - br - 3 * s, ty + th - 3 * s, 2 * br + 6 * s, 2 * br + 6 * s), glm::vec4(1, 1, 1, 0.30f), br + 3 * s);
-        ui.Rect(glm::vec4(tx - br, ty + th, 2 * br, 2 * br), glm::vec4(cTemp, 1.0f), br);
-        ui.Rect(glm::vec4(tx - br * 0.45f, ty + th + br * 0.35f, br * 0.5f, br * 0.5f), glm::vec4(1, 1, 1, 0.45f), br * 0.25f);
-        for (int k = 26; k <= 34; k += 2) {
-            float y = ty + th * (1.0f - (k - T_MIN) / (T_MAX - T_MIN));
-            ui.Rect(glm::vec4(tx - tw * 0.5f - 14 * s, y - 1 * s, 9 * s, 2 * s), glm::vec4(1, 1, 1, 0.7f));
-            snprintf(b, sizeof(b), "%d", k);
-            ui.Texto(b, tx - tw * 0.5f - 18 * s, y - 8 * s, 13 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.9f), 2, false);
-        }
-        float yu = ty + th * (1.0f - (T_UMBRAL - T_MIN) / (T_MAX - T_MIN));
-        ui.Rect(glm::vec4(tx - tw * 0.5f - 5 * s, yu - 1.5f * s, tw + 10 * s, 3 * s), glm::vec4(1.0f, 0.55f, 0.3f, 1.0f));
-        ui.Texto("Umbral", tx + tw * 0.5f + 9 * s, yu - 16 * s, 12 * s, glm::vec4(1.0f, 0.65f, 0.4f, 1.0f));
-        ui.Texto("29 °C", tx + tw * 0.5f + 9 * s, yu - 2 * s, 12 * s, glm::vec4(1.0f, 0.65f, 0.4f, 1.0f));
-        ui.Texto("↑  subir   ↓  bajar", px + pw * 0.5f, py + ph - 42 * s, 12 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
-        ui.Texto(automatico ? "T  auto (activo)" : "T  auto   R  reiniciar", px + pw * 0.5f, py + ph - 24 * s, 12 * s,
-                 automatico ? glm::vec4(1.0f, 0.75f, 0.4f, 1.0f) : glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- termometro (derecha)
+            float pw = 150.0f * s, ph = 430.0f * s, px = W - pw - 18.0f * s, py = 96.0f * s;
+            if (temperatura >= T_UMBRAL) ui.Resplandor(glm::vec4(px - 14 * s, py - 14 * s, pw + 28 * s, ph + 28 * s), glm::vec4(cTemp, 0.25f + 0.2f * sinf(t * 5.0f)), 18 * s, 14 * s);
+            ui.Rect(glm::vec4(px, py, pw, ph), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 16.0f * s);
+            ui.Texto("TEMPERATURA", px + pw * 0.5f, py + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f), 1);
+            snprintf(b, sizeof(b), "%.1f °C", temperatura);
+            ui.Texto(b, px + pw * 0.5f, py + 30 * s, 32 * s, glm::vec4(cTemp, 1.0f), 1);
+            float tx = px + pw * 0.40f, tw = 20.0f * s, ty = py + 88 * s, th = 250.0f * s;
+            ui.Rect(glm::vec4(tx - tw * 0.5f - 3 * s, ty - 3 * s, tw + 6 * s, th + 6 * s), glm::vec4(1, 1, 1, 0.30f), (tw + 6 * s) * 0.5f);
+            ui.Rect(glm::vec4(tx - tw * 0.5f, ty, tw, th), glm::vec4(0.03f, 0.10f, 0.15f, 0.95f), tw * 0.5f);
+            float frac = (temperatura - T_MIN) / (T_MAX - T_MIN);
+            float fh = th * frac;
+            ui.Rect(glm::vec4(tx - tw * 0.5f + 4 * s, ty + th - fh, tw - 8 * s, fh + 6 * s), glm::vec4(cTemp, 1.0f), (tw - 8 * s) * 0.5f);
+            float br = 21.0f * s;
+            ui.Rect(glm::vec4(tx - br - 3 * s, ty + th - 3 * s, 2 * br + 6 * s, 2 * br + 6 * s), glm::vec4(1, 1, 1, 0.30f), br + 3 * s);
+            ui.Rect(glm::vec4(tx - br, ty + th, 2 * br, 2 * br), glm::vec4(cTemp, 1.0f), br);
+            ui.Rect(glm::vec4(tx - br * 0.45f, ty + th + br * 0.35f, br * 0.5f, br * 0.5f), glm::vec4(1, 1, 1, 0.45f), br * 0.25f);
+            for (int k = 26; k <= 34; k += 2) {
+                float y = ty + th * (1.0f - (k - T_MIN) / (T_MAX - T_MIN));
+                ui.Rect(glm::vec4(tx - tw * 0.5f - 14 * s, y - 1 * s, 9 * s, 2 * s), glm::vec4(1, 1, 1, 0.7f));
+                snprintf(b, sizeof(b), "%d", k);
+                ui.Texto(b, tx - tw * 0.5f - 18 * s, y - 8 * s, 13 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.9f), 2, false);
+            }
+            float yu = ty + th * (1.0f - (T_UMBRAL - T_MIN) / (T_MAX - T_MIN));
+            ui.Rect(glm::vec4(tx - tw * 0.5f - 5 * s, yu - 1.5f * s, tw + 10 * s, 3 * s), glm::vec4(1.0f, 0.55f, 0.3f, 1.0f));
+            ui.Texto("Umbral", tx + tw * 0.5f + 9 * s, yu - 16 * s, 12 * s, glm::vec4(1.0f, 0.65f, 0.4f, 1.0f));
+            ui.Texto("29 °C", tx + tw * 0.5f + 9 * s, yu - 2 * s, 12 * s, glm::vec4(1.0f, 0.65f, 0.4f, 1.0f));
+            ui.Texto("↑  subir   ↓  bajar", px + pw * 0.5f, py + ph - 42 * s, 12 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
+            ui.Texto(automatico ? "T  auto (activo)" : "T  auto   R  reiniciar", px + pw * 0.5f, py + ph - 24 * s, 12 * s,
+                     automatico ? glm::vec4(1.0f, 0.75f, 0.4f, 1.0f) : glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
 
-        // ---------------- estado del arrecife (abajo a la izquierda)
-        float bw = 330.0f * s, bh = 222.0f * s, bx = 18.0f * s, by = H - bh - 18.0f * s;
-        ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
-        ui.Texto("SALUD DEL ARRECIFE", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        glm::vec3 cSalud = salud > 0.66f ? glm::vec3(0.4f, 0.95f, 0.55f) : (salud > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
-        float barW = bw - 32 * s - 52 * s;
-        ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW, 14 * s), glm::vec4(1, 1, 1, 0.15f), 7 * s);
-        ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW * (salud < 0.02f ? 0.02f : salud), 14 * s), glm::vec4(cSalud, 1.0f), 7 * s);
-        snprintf(b, sizeof(b), "%d%%", (int)(salud * 100.0f + 0.5f));
-        ui.Texto(b, bx + bw - 16 * s, by + 31 * s, 19 * s, glm::vec4(cSalud, 1.0f), 2);
-        snprintf(b, sizeof(b), "Corales blanqueados: %d de %d", blanqueados, corales);
-        ui.Texto(b, bx + 16 * s, by + 60 * s, 14 * s, glm::vec4(0.95f, 0.95f, 0.95f, 1.0f), 0, false);
-        snprintf(b, sizeof(b), "Corales muertos: %d", muertos);
-        ui.Texto(b, bx + 16 * s, by + 82 * s, 14 * s, glm::vec4(muertos ? glm::vec3(1.0f, 0.6f, 0.55f) : glm::vec3(0.95f), 1.0f), 0, false);
-        snprintf(b, sizeof(b), "Especies registradas: %d de %d  (L: lista)", (int)registradas.size(), totalEspecies);
-        ui.Texto(b, bx + 16 * s, by + 104 * s, 14 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
-        ui.Texto("OBJETIVOS", bx + 16 * s, by + 132 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        bool hecho[3] = { calento, recupero, (int)registradas.size() >= totalEspecies };
-        const char* obj[3] = { "Sube la temperatura hasta blanquear el arrecife", "Enfría el agua (↓) o restaura (R)", "Registra todas las especies" };
-        for (int k = 0; k < 3; k++) {
-            glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
-            ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, by + 152 * s + k * 22 * s, 16 * s, c, 1);
-            ui.Texto(obj[k], bx + 36 * s, by + 154 * s + k * 22 * s, 13 * s, c, 0, false);
         }
+        else {                    // pantalla limpia: version compacta
+            glm::vec3 cT = temperatura >= T_UMBRAL ? glm::vec3(1.0f, 0.5f, 0.35f) : glm::vec3(0.45f, 0.85f, 1.0f);
+            HUDTermometroCompacto(ui, temperatura, T_MIN, T_MAX, T_UMBRAL, cT, "↑ ↓");
+        }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- estado del arrecife (abajo a la izquierda)
+            float bw = 330.0f * s, bh = 222.0f * s, bx = 18.0f * s, by = H - bh - 18.0f * s;
+            ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
+            ui.Texto("SALUD DEL ARRECIFE", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+            glm::vec3 cSalud = salud > 0.66f ? glm::vec3(0.4f, 0.95f, 0.55f) : (salud > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
+            float barW = bw - 32 * s - 52 * s;
+            ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW, 14 * s), glm::vec4(1, 1, 1, 0.15f), 7 * s);
+            ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW * (salud < 0.02f ? 0.02f : salud), 14 * s), glm::vec4(cSalud, 1.0f), 7 * s);
+            snprintf(b, sizeof(b), "%d%%", (int)(salud * 100.0f + 0.5f));
+            ui.Texto(b, bx + bw - 16 * s, by + 31 * s, 19 * s, glm::vec4(cSalud, 1.0f), 2);
+            snprintf(b, sizeof(b), "Corales blanqueados: %d de %d", blanqueados, corales);
+            ui.Texto(b, bx + 16 * s, by + 60 * s, 14 * s, glm::vec4(0.95f, 0.95f, 0.95f, 1.0f), 0, false);
+            snprintf(b, sizeof(b), "Corales muertos: %d", muertos);
+            ui.Texto(b, bx + 16 * s, by + 82 * s, 14 * s, glm::vec4(muertos ? glm::vec3(1.0f, 0.6f, 0.55f) : glm::vec3(0.95f), 1.0f), 0, false);
+            snprintf(b, sizeof(b), "Especies registradas: %d de %d  (L: lista)", (int)registradas.size(), totalEspecies);
+            ui.Texto(b, bx + 16 * s, by + 104 * s, 14 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
+            ui.Texto("OBJETIVOS", bx + 16 * s, by + 132 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+            bool hecho[3] = { calento, recupero, (int)registradas.size() >= totalEspecies };
+            const char* obj[3] = { "Sube la temperatura hasta blanquear el arrecife", "Enfría el agua (↓) o restaura (R)", "Registra todas las especies" };
+            for (int k = 0; k < 3; k++) {
+                glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
+                ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, by + 152 * s + k * 22 * s, 16 * s, c, 1);
+                ui.Texto(obj[k], bx + 36 * s, by + 154 * s + k * 22 * s, 13 * s, c, 0, false);
+            }
 
+        }
+        else {                    // pantalla limpia: version compacta
+            bool h0 = calento, h1 = recupero, h2 = (int)registradas.size() >= totalEspecies;
+            const char* txt = !h0 ? "Sube la temperatura (↑) hasta blanquear el arrecife"
+                            : !h1 ? "Enfría el agua (↓) o restaura con R"
+                            : !h2 ? "Registra las especies con la mira (L: lista)" : "¡Objetivos completos!";
+            char ex[64]; snprintf(ex, sizeof(ex), "Especies %d/%d · corales muertos %d", (int)registradas.size(), totalEspecies, muertos);
+            HUDObjetivo(ui, txt, (int)h0 + (int)h1 + (int)h2, 3, ex);
+        }
         // ---------------- avisos (arriba al centro)
         float ay = 92.0f * s;
-        for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < 2; i--, n++) {
+        for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < (HUD().detallado ? 2 : 1); i--, n++) {
             const AvisoHUD& a = avisos[i];
             float alfa = a.vida < 0.6f ? a.vida / 0.6f : (a.total - a.vida < 0.3f ? (a.total - a.vida) / 0.3f : 1.0f);
             std::vector<std::string> ls = ui.Lineas(a.texto, 600.0f * s, 16.0f * s, true);
@@ -257,19 +286,23 @@ public:
             ay += ah + 8 * s;
         }
 
-        // ---------------- ayuda de controles (primeros 20 segundos), entre el panel y el borde derecho
-        float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
-        if (ayuda > 0.0f) {
-            float x0 = bx + bw + 18 * s, x1 = W - 18 * s, aw = x1 - x0;
-            const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  Clic inspeccionar objeto  ·  Esc menú";
-            const char* l2 = "↑ / ↓ temperatura  ·  T calentamiento automático  ·  R restaurar  ·  Apunta a las especies para registrarlas";
-            std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
-            float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, ay2 = H - 18 * s - ah;
-            ui.Rect(glm::vec4(x0, ay2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
-            float yy = ay2 + 10 * s;
-            for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); yy += lh; }
-            for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); yy += lh; }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- ayuda de controles (primeros 20 segundos), entre el panel y el borde derecho
+            float bx = 18.0f * s, bw = 330.0f * s;   // posicion del panel de objetivos (la ayuda va a su derecha)
+            float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
+            if (ayuda > 0.0f) {
+                float x0 = bx + bw + 18 * s, x1 = W - 18 * s, aw = x1 - x0;
+                const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  Clic inspeccionar objeto  ·  Esc menú";
+                const char* l2 = "↑ / ↓ temperatura  ·  T calentamiento automático  ·  R restaurar  ·  Apunta a las especies para registrarlas";
+                std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
+                float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, ay2 = H - 18 * s - ah;
+                ui.Rect(glm::vec4(x0, ay2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
+                float yy = ay2 + 10 * s;
+                for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); yy += lh; }
+                for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); yy += lh; }
+            }
         }
+        HUDPistaTeclas(ui);
         if (verLista) HUDListaEspecies(ui, especiesLista, registradas);
         if (completado) {
             char r1[64], r2[64], r3[64];

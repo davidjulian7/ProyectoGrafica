@@ -26,6 +26,9 @@ uniform mat4 view;
 uniform mat4 projection;
 
 uniform float uTiempo;
+uniform int uBuzo;        // 1 solo mientras se dibuja el buzo
+uniform float uBuzoFase;  // fase del aleteo
+uniform float uBuzoMov;   // 0 quieto .. 1 nadando rapido
 uniform float uOndula;    // amplitud de la ondulacion (metros); 0 = rigido
 uniform float uLargo;     // medio largo del modelo (la cabeza esta en +X)
 uniform float uVelNado;   // velocidad de la ondulacion
@@ -67,6 +70,26 @@ void main()
             p = (huesos * vec4(aPos, 1.0)).xyz;
             normal = mat3(huesos) * aNormal;
         }
+    }
+    if (uBuzo == 1) {
+        // ANIMACION PROCEDURAL DEL BUZO (modelo de pie: Z arriba, cara hacia -Y, cadera en z = 0)
+        // [CAMBIAR] amplitud de la patada: 0.14 en reposo + 0.38 nadando (radianes)
+        float lado = p.x < 0.0 ? 0.0 : 3.14159;                       // piernas alternadas
+        float bajo = clamp(-p.z / 0.79, 0.0, 1.0);                    // 0 en la cadera, 1 en el tobillo
+        float ang = (0.14 + 0.38 * uBuzoMov) * sin(uBuzoFase * 2.0 + lado) * pow(bajo, 0.8);
+        ang += (0.12 + 0.30 * uBuzoMov) * sin(uBuzoFase * 2.0 + lado - 0.9) * smoothstep(-0.70, -0.92, p.z);   // la aleta dobla de mas
+        if (p.z < 0.02) {
+            float c = cos(ang), sn = sin(ang);
+            vec2 yz = vec2(p.y - 0.12, p.z);
+            p.y = 0.12 + c * yz.x - sn * yz.y;  p.z = sn * yz.x + c * yz.y;
+            normal = vec3(normal.x, c * normal.y - sn * normal.z, sn * normal.y + c * normal.z);
+        }
+        // brazos: se mecen hacia adelante y atras
+        float brazo = smoothstep(0.26, 0.55, abs(p.x)) * step(-0.12, p.z);
+        p.y += brazo * sin(uBuzoFase + lado) * (0.03 + 0.07 * uBuzoMov);
+        // respiracion: el pecho se expande un poco
+        float pecho = smoothstep(0.05, 0.25, p.z) * smoothstep(0.62, 0.42, p.z);
+        p.y -= pecho * (0.010 + 0.006 * sin(uTiempo * 1.3)) * (p.y < 0.1 ? 1.0 : -1.0);
     }
     if (uOndula > 0.0) {
         // 0 en la cabeza, 1 en la cola: la cola se mueve mas que la cabeza

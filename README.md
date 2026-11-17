@@ -8,6 +8,12 @@ Un recorrido submarino en primera persona, hecho en **C++ y OpenGL 3.3**, donde 
 
 ---
 
+## 🧭 El recorrido
+
+Desde el menú se elige una zona (Enter empieza en la Zona 1). Al entrar, una tarjeta explica la historia, los objetivos y los controles. Al completar los objetivos aparece **"Siguiente zona"** y el buzo pasa solo a la siguiente: **Arrecifes → Aguas Frías → Naufragios → ¡Recorrido completado!**
+
+La pantalla se mantiene limpia: solo se ve el objetivo actual, el indicador de la zona (termómetro o limpieza) y un aviso a la vez. Con **H** se muestran todos los paneles y con **I** la ficha completa del animal que señala la mira.
+
 ## 🐠 Las tres zonas
 
 ### Zona 1 · Arrecifes: estrés térmico y blanqueamiento
@@ -95,6 +101,9 @@ El ejecutable se genera en `src/bin/ProyectoFinal.exe`, junto a los recursos, y 
 | **E** | Modo edición de objetos |
 | **↑ / ↓ · T · R** | Temperatura · calentamiento automático · restaurar (Zona 1) |
 | **T / G · X** | Calentar / enfriar · fotografiar (Zona 2) |
+| **Enter / clic** | Empezar la zona (tarjeta de indicaciones) · pasar a la siguiente zona |
+| **H** | Mostrar u ocultar todos los paneles (ayuda) |
+| **I** | Ficha completa del animal u objeto bajo la mira |
 | **F1** | Silenciar |
 | **Esc** | Volver al menú / salir |
 

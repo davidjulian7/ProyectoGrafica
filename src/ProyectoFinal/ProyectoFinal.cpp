@@ -91,6 +91,14 @@ MenuInicio menuInicio;      // menú de inicio (include/menu.h)
 float zonaFade = 0.0f;      // fundido de entrada a una zona: 1 = negro, 0 = visible
 float zonaTiempo = 0.0f;    // segundos dentro de la zona actual
 
+// --- Recorrido: al completar una zona se pasa sola a la siguiente (1 -> 2 -> 3 -> pantalla final)
+// [CAMBIAR] ESPERA_SIGUIENTE = segundos que se espera antes de pasar sola a la siguiente zona (Enter la adelanta)
+const float ESPERA_SIGUIENTE = 15.0f;
+float tSiguiente = -1.0f;            // segundos desde que se completo la zona (-1 = aun no)
+bool recorridoTerminado = false;     // se completaron las tres zonas: pantalla final
+void AvanzarRecorrido();
+void CerrarIntro();
+
 Escenario escenario;        // zonas de inmersión (include/zonas.h)
 MecanicaArrecife arrecife;  // mecánica de la Zona 1 (include/arrecife.h)
 MecanicaNaufragios naufragio; // mecánica de la Zona 3 (include/naufragios.h)
@@ -353,26 +361,37 @@ bool Update() {
 	zonaTiempo += dtEscena;
 
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
-	if (!inspeccion) processInput(window);
+	if (HUD().intro) HUD().introTiempo += deltaTime;
+	if (!inspeccion && !HUD().intro) processInput(window);
 	if (escenario.Actualizar(dtEscena, animTime, camera))
 		Efecto("sound/burbujas.wav", 0.35f);          // exhalación del buzo
-	if (estadoActual == ARRECIFES) {
+	if (estadoActual == ARRECIFES && !HUD().intro) {
 		arrecife.Actualizar(dtEscena, window, escenario, escenario.Seleccionado());
 		if (arrecife.sonarAlerta) { Efecto("sound/alerta.wav", 0.6f); arrecife.sonarAlerta = false; }
 		if (arrecife.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); arrecife.sonarDescubrir = false; }
 	}
-	if (estadoActual == AGUAS_FRIAS) {
+	if (estadoActual == AGUAS_FRIAS && !HUD().intro) {
 		aguasFrias.Actualizar(deltaTime, window, escenario, escenario.Seleccionado());
 		if (aguasFrias.sonarAlerta) { Efecto("sound/alerta.wav", 0.5f); aguasFrias.sonarAlerta = false; }
 		if (aguasFrias.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); aguasFrias.sonarDescubrir = false; }
 		if (aguasFrias.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); aguasFrias.sonarRecoger = false; }
 	}
-	if (estadoActual == NAUFRAGIOS) {
+	if (estadoActual == NAUFRAGIOS && !HUD().intro) {
 		naufragio.Actualizar(deltaTime, animTime, window, escenario, camera, escenario.Seleccionado());
 		if (naufragio.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); naufragio.sonarRecoger = false; }
 		if (naufragio.sonarAlerta) { Efecto("sound/alerta.wav", 0.5f); naufragio.sonarAlerta = false; }
 		if (naufragio.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); naufragio.sonarDescubrir = false; }
 		if (naufragio.sonarMonedas) { Efecto("sound/monedas.wav", 0.8f); naufragio.sonarMonedas = false; }
+	}
+
+	// Recorrido: cuando la zona se completa empieza la cuenta para pasar a la siguiente
+	bool zonaHecha = (estadoActual == ARRECIFES && arrecife.completado)
+	              || (estadoActual == AGUAS_FRIAS && aguasFrias.Completado())
+	              || (estadoActual == NAUFRAGIOS && naufragio.Terminado());
+	if (zonaHecha && tSiguiente < 0.0f) tSiguiente = 0.0f;
+	if (tSiguiente >= 0.0f && !recorridoTerminado) {
+		tSiguiente += deltaTime;
+		if (tSiguiente >= ESPERA_SIGUIENTE) AvanzarRecorrido();
 	}
 
 	// Vaivén de la vista: respiración siempre presente + aleteo al nadar
@@ -442,10 +461,29 @@ bool Update() {
 		: estadoActual == AGUAS_FRIAS ? aguasFrias.Detalle(*sel, colorDetalle)
 		: estadoActual == NAUFRAGIOS ? naufragio.Detalle(*sel, colorDetalle) : std::string();
 	if (!inspeccion) menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
-	if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
-	if (estadoActual == AGUAS_FRIAS) aguasFrias.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
-	if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
+	if (!HUD().intro && !recorridoTerminado) {
+		if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
+		if (estadoActual == AGUAS_FRIAS) aguasFrias.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
+		if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
+	}
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
+	menuInicio.Comenzar(window);
+	if (HUD().intro) {                                   // indicaciones al entrar a la zona
+		IntroZona in = estadoActual == ARRECIFES ? arrecife.Intro() : (estadoActual == AGUAS_FRIAS ? aguasFrias.Intro() : naufragio.Intro());
+		HUDIntro(menuInicio, in, HUD().introTiempo);
+	}
+	else if (recorridoTerminado) {                      // pantalla final del recorrido
+		HUDZonaCompletada(menuInicio, 2.0f, "Recorriste las tres zonas del acuario",
+			{ "Arrecifes: provocaste y salvaste el blanqueamiento del coral", "Aguas Frías: viviste el deshielo y restauraste el hielo",
+			  "Naufragios: limpiaste el fondo y liberaste a la tortuga" },
+			"El océano produce la mitad del oxígeno que respiramos. Lo que hacemos en tierra llega al mar: cuidarlo está en nuestras manos.",
+			"¡RECORRIDO COMPLETADO!", 1e9f);
+	}
+	else if (tSiguiente >= 0.0f) {                      // zona completada: aviso de la siguiente
+		const char* siguientes[] = { "", "Siguiente: Zona 2 · Aguas Frías", "Siguiente: Zona 3 · Naufragios", "Fin del recorrido" };
+		HUDSiguienteZona(menuInicio, siguientes[estadoActual], ESPERA_SIGUIENTE - tSiguiente, animTime);
+	}
+	menuInicio.Terminar();
 	if (inspeccion) {
 		const Elemento* observado = escenario.ElementoInspeccionado();
 		if (observado) menuInicio.DrawInspeccion(window, observado->etiqueta, observado->archivo, detalle, colorDetalle);
@@ -602,6 +640,11 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 			menuInicio.OnClick();
 		return;
 	}
+	if (HUD().intro) {                                   // clic: cerrar las indicaciones y empezar
+		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) CerrarIntro();
+		return;
+	}
+	if (recorridoTerminado) return;
 	if (estadoActual == ARRECIFES && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !escenario.modoEdicion) {
 		if (escenario.InspeccionActiva()) escenario.CerrarInspeccion();
 		else escenario.AbrirInspeccion();
@@ -716,6 +759,23 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		return;
 	}
 
+	// Indicaciones al entrar: Enter / Espacio para empezar
+	if (HUD().intro) {
+		if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_SPACE) CerrarIntro();
+		else if (key == GLFW_KEY_ESCAPE) VolverAlMenu();
+		return;
+	}
+	// Pantalla final del recorrido: Enter o Esc vuelven al menu
+	if (recorridoTerminado) {
+		if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ESCAPE) VolverAlMenu();
+		return;
+	}
+	// Zona completada: Enter pasa a la siguiente sin esperar
+	if ((key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) && tSiguiente >= 0.0f) { AvanzarRecorrido(); return; }
+	// [CAMBIAR] H = mostrar/ocultar todos los paneles · I = ficha completa del objeto bajo la mira
+	if (key == GLFW_KEY_H) { HUD().detallado = !HUD().detallado; return; }
+	if (key == GLFW_KEY_I) { HUD().fichaAbierta = !HUD().fichaAbierta; return; }
+
 	// Dentro de una zona: Esc regresa al menú de inicio, F enciende/apaga la linterna
 	if (key == GLFW_KEY_ESCAPE)
 		VolverAlMenu();
@@ -811,6 +871,8 @@ void EntrarZona(int zona)
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	zonaFade = 1.0f;   // la zona aparece desde negro
+	HUD().intro = true; HUD().introTiempo = 0.0f; HUD().fichaAbierta = false;   // primero las indicaciones
+	tSiguiente = -1.0f; recorridoTerminado = false;
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	std::string titulo = std::string("Acuario Virtual Interactivo - ") + nombresZona[zona];
@@ -818,8 +880,24 @@ void EntrarZona(int zona)
 	std::cout << ">> Entrando a " << nombresZona[zona] << " (Esc para volver al menu)" << std::endl;
 }
 
+// Cierra la tarjeta de indicaciones y empieza la actividad
+void CerrarIntro()
+{
+	HUD().intro = false;
+	firstMouse = true;
+	lastFrame = (float)glfwGetTime();
+}
+
+// Recorrido: pasa a la siguiente zona o, despues de la ultima, a la pantalla final
+void AvanzarRecorrido()
+{
+	if (estadoActual >= NAUFRAGIOS) { recorridoTerminado = true; tSiguiente = -1.0f; return; }
+	EntrarZona((int)estadoActual + 1);
+}
+
 void VolverAlMenu()
 {
+	HUD().intro = false; tSiguiente = -1.0f; recorridoTerminado = false;
 	estadoActual = MENU;
 	menuInicio.Reiniciar();
 	Ambiente("sound/ambiente_arrecife.wav", silencio ? 0.0f : 0.25f);   // ambiente suave en el menú

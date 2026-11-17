@@ -83,7 +83,9 @@ inline void Escenario::Dibujar(const glm::mat4& proj, const glm::mat4& view, con
         pose = glm::rotate(pose, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         pose = glm::translate(pose, glm::vec3(0.0f, 0.25f, -0.72f));
         sh->setMat4("model", pose);
+        sh->setInt("uBuzo", 1); sh->setFloat("uBuzoFase", buzoFase); sh->setFloat("uBuzoMov", mov);   // animacion de piernas y brazos (objetos.vs)
         buzoModelo->Draw(*sh);
+        sh->setInt("uBuzo", 0);
     }
 
     // monedas voladoras: oro metalico con destellos

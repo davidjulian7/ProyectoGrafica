@@ -238,6 +238,21 @@ public:
     }
 
     // ------------------------------------------------------------------ HUD
+    bool Completado() const { return estadoFinal == 2; }   // aguas restauradas: pasa a la siguiente zona
+
+    // Indicaciones al entrar a la zona (tarjeta inicial)
+    IntroZona Intro() const
+    {
+        IntroZona in; in.titulo = "ZONA 2 · AGUAS FRÍAS"; in.subtitulo = "Deshielo y cadenas tróficas";
+        in.historia = "El hielo marino sostiene toda la cadena alimenticia polar: del krill a las ballenas. Sin él, focas, pingüinos y osos pierden su hogar.";
+        in.objetivos = { "Calienta el agua (T) y derrite la mitad del hielo", "Fotografía a un animal fantasma (X)",
+                         "Fotografía las especies (X)", "Alimenta a 4 animales (clic en krill o pescado)", "Enfría el agua (G) y restaura el hielo" };
+        in.controles = { "WASD nadar · Espacio / Ctrl subir y bajar · Shift aletear · Ratón mirar",
+                         "Clic recoger o alimentar · I ficha del animal · H ayuda · Esc menú" };
+        in.color = glm::vec3(0.6f, 0.9f, 1.0f);
+        return in;
+    }
+
     void DibujarHUD(MenuInicio& ui, GLFWwindow* ventana, float t, float tiempoEnZona)
     {
         ui.Comenzar(ventana);
@@ -245,79 +260,102 @@ public:
         char b[96];
         glm::vec3 cTemp = ColorTemperatura(temperatura);
 
-        // ---------------- termometro (derecha)
-        float pw = 150.0f * s, ph = 430.0f * s, px = W - pw - 18.0f * s, py = 96.0f * s;
-        if (temperatura >= T_CONGELA) ui.Resplandor(glm::vec4(px - 14 * s, py - 14 * s, pw + 28 * s, ph + 28 * s), glm::vec4(cTemp, 0.25f + 0.2f * sinf(t * 5.0f)), 18 * s, 14 * s);
-        ui.Rect(glm::vec4(px, py, pw, ph), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 16.0f * s);
-        ui.Texto("TEMPERATURA", px + pw * 0.5f, py + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f), 1);
-        snprintf(b, sizeof(b), "%.1f °C", temperatura);
-        ui.Texto(b, px + pw * 0.5f, py + 30 * s, 32 * s, glm::vec4(cTemp, 1.0f), 1);
-        float tx = px + pw * 0.40f, tw = 20.0f * s, ty = py + 88 * s, th = 250.0f * s;
-        ui.Rect(glm::vec4(tx - tw * 0.5f - 3 * s, ty - 3 * s, tw + 6 * s, th + 6 * s), glm::vec4(1, 1, 1, 0.30f), (tw + 6 * s) * 0.5f);
-        ui.Rect(glm::vec4(tx - tw * 0.5f, ty, tw, th), glm::vec4(0.03f, 0.10f, 0.15f, 0.95f), tw * 0.5f);
-        float frac = (temperatura - T_MIN) / (T_MAX - T_MIN);
-        float fh = th * frac;
-        ui.Rect(glm::vec4(tx - tw * 0.5f + 4 * s, ty + th - fh, tw - 8 * s, fh + 6 * s), glm::vec4(cTemp, 1.0f), (tw - 8 * s) * 0.5f);
-        float br = 21.0f * s;
-        ui.Rect(glm::vec4(tx - br - 3 * s, ty + th - 3 * s, 2 * br + 6 * s, 2 * br + 6 * s), glm::vec4(1, 1, 1, 0.30f), br + 3 * s);
-        ui.Rect(glm::vec4(tx - br, ty + th, 2 * br, 2 * br), glm::vec4(cTemp, 1.0f), br);
-        ui.Rect(glm::vec4(tx - br * 0.45f, ty + th + br * 0.35f, br * 0.5f, br * 0.5f), glm::vec4(1, 1, 1, 0.45f), br * 0.25f);
-        for (int k = -2; k <= 4; k += 2) {
-            float y = ty + th * (1.0f - (k - T_MIN) / (T_MAX - T_MIN));
-            ui.Rect(glm::vec4(tx - tw * 0.5f - 14 * s, y - 1 * s, 9 * s, 2 * s), glm::vec4(1, 1, 1, 0.7f));
-            snprintf(b, sizeof(b), "%d", k);
-            ui.Texto(b, tx - tw * 0.5f - 18 * s, y - 8 * s, 13 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.9f), 2, false);
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- termometro (derecha)
+            float pw = 150.0f * s, ph = 430.0f * s, px = W - pw - 18.0f * s, py = 96.0f * s;
+            if (temperatura >= T_CONGELA) ui.Resplandor(glm::vec4(px - 14 * s, py - 14 * s, pw + 28 * s, ph + 28 * s), glm::vec4(cTemp, 0.25f + 0.2f * sinf(t * 5.0f)), 18 * s, 14 * s);
+            ui.Rect(glm::vec4(px, py, pw, ph), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 16.0f * s);
+            ui.Texto("TEMPERATURA", px + pw * 0.5f, py + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f), 1);
+            snprintf(b, sizeof(b), "%.1f °C", temperatura);
+            ui.Texto(b, px + pw * 0.5f, py + 30 * s, 32 * s, glm::vec4(cTemp, 1.0f), 1);
+            float tx = px + pw * 0.40f, tw = 20.0f * s, ty = py + 88 * s, th = 250.0f * s;
+            ui.Rect(glm::vec4(tx - tw * 0.5f - 3 * s, ty - 3 * s, tw + 6 * s, th + 6 * s), glm::vec4(1, 1, 1, 0.30f), (tw + 6 * s) * 0.5f);
+            ui.Rect(glm::vec4(tx - tw * 0.5f, ty, tw, th), glm::vec4(0.03f, 0.10f, 0.15f, 0.95f), tw * 0.5f);
+            float frac = (temperatura - T_MIN) / (T_MAX - T_MIN);
+            float fh = th * frac;
+            ui.Rect(glm::vec4(tx - tw * 0.5f + 4 * s, ty + th - fh, tw - 8 * s, fh + 6 * s), glm::vec4(cTemp, 1.0f), (tw - 8 * s) * 0.5f);
+            float br = 21.0f * s;
+            ui.Rect(glm::vec4(tx - br - 3 * s, ty + th - 3 * s, 2 * br + 6 * s, 2 * br + 6 * s), glm::vec4(1, 1, 1, 0.30f), br + 3 * s);
+            ui.Rect(glm::vec4(tx - br, ty + th, 2 * br, 2 * br), glm::vec4(cTemp, 1.0f), br);
+            ui.Rect(glm::vec4(tx - br * 0.45f, ty + th + br * 0.35f, br * 0.5f, br * 0.5f), glm::vec4(1, 1, 1, 0.45f), br * 0.25f);
+            for (int k = -2; k <= 4; k += 2) {
+                float y = ty + th * (1.0f - (k - T_MIN) / (T_MAX - T_MIN));
+                ui.Rect(glm::vec4(tx - tw * 0.5f - 14 * s, y - 1 * s, 9 * s, 2 * s), glm::vec4(1, 1, 1, 0.7f));
+                snprintf(b, sizeof(b), "%d", k);
+                ui.Texto(b, tx - tw * 0.5f - 18 * s, y - 8 * s, 13 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.9f), 2, false);
+            }
+            float yu = ty + th * (1.0f - (T_CONGELA - T_MIN) / (T_MAX - T_MIN));
+            ui.Rect(glm::vec4(tx - tw * 0.5f - 5 * s, yu - 1.5f * s, tw + 10 * s, 3 * s), glm::vec4(0.7f, 0.9f, 1.0f, 1.0f));
+            ui.Texto("Congela", tx + tw * 0.5f + 9 * s, yu - 16 * s, 12 * s, glm::vec4(0.7f, 0.9f, 1.0f, 1.0f));
+            ui.Texto("0 °C", tx + tw * 0.5f + 9 * s, yu - 2 * s, 12 * s, glm::vec4(0.7f, 0.9f, 1.0f, 1.0f));
+            ui.Texto("T  calentar   G  enfriar", px + pw * 0.5f, py + ph - 42 * s, 12 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
+            ui.Texto("X  foto   R  reiniciar", px + pw * 0.5f, py + ph - 24 * s, 12 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
+
         }
-        float yu = ty + th * (1.0f - (T_CONGELA - T_MIN) / (T_MAX - T_MIN));
-        ui.Rect(glm::vec4(tx - tw * 0.5f - 5 * s, yu - 1.5f * s, tw + 10 * s, 3 * s), glm::vec4(0.7f, 0.9f, 1.0f, 1.0f));
-        ui.Texto("Congela", tx + tw * 0.5f + 9 * s, yu - 16 * s, 12 * s, glm::vec4(0.7f, 0.9f, 1.0f, 1.0f));
-        ui.Texto("0 °C", tx + tw * 0.5f + 9 * s, yu - 2 * s, 12 * s, glm::vec4(0.7f, 0.9f, 1.0f, 1.0f));
-        ui.Texto("T  calentar   G  enfriar", px + pw * 0.5f, py + ph - 42 * s, 12 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
-        ui.Texto("X  foto   R  reiniciar", px + pw * 0.5f, py + ph - 24 * s, 12 * s, glm::vec4(0.85f, 0.92f, 1.0f, 0.95f), 1, false);
-
-        // ---------------- cadena trofica (izquierda, arriba)
-        float cw = 270.0f * s, ch = 168.0f * s, cx = 18.0f * s, cy = 96.0f * s;
-        ui.Rect(glm::vec4(cx, cy, cw, ch), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
-        ui.Texto("CADENA TRÓFICA", cx + 16 * s, cy + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        const char* nombres[4] = { "Krill", "Bacalao", "Focas y pingüinos", "Ballena y oso polar" };
-        for (int i = 0; i < 4; i++) {
-            float v = Nivel(i);
-            glm::vec3 c = v > 0.66f ? glm::vec3(0.4f, 0.95f, 0.55f) : (v > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
-            float yy = cy + 38 * s + i * 31 * s;
-            ui.Texto(nombres[i], cx + 16 * s, yy, 13 * s, glm::vec4(0.95f, 0.95f, 0.95f, 1.0f), 0, false);
-            float bw = cw - 32 * s;
-            ui.Rect(glm::vec4(cx + 16 * s, yy + 16 * s, bw, 7 * s), glm::vec4(1, 1, 1, 0.15f), 3.5f * s);
-            ui.Rect(glm::vec4(cx + 16 * s, yy + 16 * s, bw * (v < 0.02f ? 0.02f : v), 7 * s), glm::vec4(c, 1.0f), 3.5f * s);
+        else {                    // pantalla limpia: version compacta
+            glm::vec3 cT = temperatura >= T_CONGELA ? glm::vec3(1.0f, 0.5f, 0.35f) : glm::vec3(0.55f, 0.9f, 1.0f);
+            HUDTermometroCompacto(ui, temperatura, T_MIN, T_MAX, T_CONGELA, cT, "T / G");
         }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- cadena trofica (izquierda, arriba)
+            float cw = 270.0f * s, ch = 168.0f * s, cx = 18.0f * s, cy = 96.0f * s;
+            ui.Rect(glm::vec4(cx, cy, cw, ch), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
+            ui.Texto("CADENA TRÓFICA", cx + 16 * s, cy + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+            const char* nombres[4] = { "Krill", "Bacalao", "Focas y pingüinos", "Ballena y oso polar" };
+            for (int i = 0; i < 4; i++) {
+                float v = Nivel(i);
+                glm::vec3 c = v > 0.66f ? glm::vec3(0.4f, 0.95f, 0.55f) : (v > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
+                float yy = cy + 38 * s + i * 31 * s;
+                ui.Texto(nombres[i], cx + 16 * s, yy, 13 * s, glm::vec4(0.95f, 0.95f, 0.95f, 1.0f), 0, false);
+                float bw = cw - 32 * s;
+                ui.Rect(glm::vec4(cx + 16 * s, yy + 16 * s, bw, 7 * s), glm::vec4(1, 1, 1, 0.15f), 3.5f * s);
+                ui.Rect(glm::vec4(cx + 16 * s, yy + 16 * s, bw * (v < 0.02f ? 0.02f : v), 7 * s), glm::vec4(c, 1.0f), 3.5f * s);
+            }
 
-        // ---------------- objetivos (abajo a la izquierda): uno por actividad
-        float bw = 330.0f * s, bh = 200.0f * s, bx = 18.0f * s, by = H - bh - 18.0f * s;
-        ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
-        ui.Texto("OBJETIVOS", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
-        glm::vec3 cH = hielo > 0.66f ? glm::vec3(0.55f, 0.9f, 1.0f) : (hielo > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
-        float barW = bw - 32 * s - 52 * s;
-        ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW, 14 * s), glm::vec4(1, 1, 1, 0.15f), 7 * s);
-        ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW * (hielo < 0.02f ? 0.02f : hielo), 14 * s), glm::vec4(cH, 1.0f), 7 * s);
-        snprintf(b, sizeof(b), "%d%%", (int)(hielo * 100.0f + 0.5f));
-        ui.Texto(b, bx + bw - 16 * s, by + 31 * s, 19 * s, glm::vec4(cH, 1.0f), 2);
-        ui.Texto("Hielo restante", bx + 16 * s, by + 52 * s, 11 * s, glm::vec4(0.7f, 0.85f, 0.95f, 0.9f), 0, false);
-        bool o1 = objCalor, o2 = objFantasma, o3 = (int)fotos.size() >= TOTAL_FOTOS, o4 = (int)alimentados.size() >= TOTAL_ALIMENTADOS;
-        bool o5 = o1 && o2 && o3 && o4 && hielo >= 0.95f;
-        glm::vec4 cOk(0.5f, 1.0f, 0.6f, 1.0f), cNo(0.95f, 0.95f, 0.95f, 1.0f);
-        float y0 = by + 72 * s, dy = 22 * s;
-        ui.Texto(o1 ? "[x] Calienta (T) y derrite la mitad del hielo" : "[ ] Calienta (T) y derrite la mitad del hielo", bx + 16 * s, y0, 14 * s, o1 ? cOk : cNo, 0, false);
-        ui.Texto(o2 ? "[x] Fotografía a un animal fantasma (X)" : "[ ] Fotografía a un animal fantasma (X)", bx + 16 * s, y0 + dy, 14 * s, o2 ? cOk : cNo, 0, false);
-        snprintf(b, sizeof(b), "%s Fotografía las 14 especies: %d/%d", o3 ? "[x]" : "[ ]", (int)fotos.size(), TOTAL_FOTOS);
-        ui.Texto(b, bx + 16 * s, y0 + 2 * dy, 14 * s, o3 ? cOk : cNo, 0, false);
-        snprintf(b, sizeof(b), "%s Alimenta a 4 animales: %d/%d", o4 ? "[x]" : "[ ]", (int)alimentados.size(), TOTAL_ALIMENTADOS);
-        ui.Texto(b, bx + 16 * s, y0 + 3 * dy, 14 * s, o4 ? cOk : cNo, 0, false);
-        ui.Texto(o5 ? "[x] Enfría (G) y restaura el hielo al 95 %" : "[ ] Enfría (G) y restaura el hielo al 95 %", bx + 16 * s, y0 + 4 * dy, 14 * s, o5 ? cOk : cNo, 0, false);
-        snprintf(b, sizeof(b), "Bolsa: krill %d · pescado %d", krillMochila, pescadoMochila);
-        ui.Texto(b, bx + 16 * s, y0 + 5 * dy + 2 * s, 12 * s, glm::vec4(1.0f, 0.85f, 0.6f, 1.0f), 0, false);
+        }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- objetivos (abajo a la izquierda): uno por actividad
+            float bw = 330.0f * s, bh = 200.0f * s, bx = 18.0f * s, by = H - bh - 18.0f * s;
+            ui.Rect(glm::vec4(bx, by, bw, bh), glm::vec4(0.01f, 0.07f, 0.12f, 0.75f), 14.0f * s);
+            ui.Texto("OBJETIVOS", bx + 16 * s, by + 12 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
+            glm::vec3 cH = hielo > 0.66f ? glm::vec3(0.55f, 0.9f, 1.0f) : (hielo > 0.33f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(1.0f, 0.45f, 0.4f));
+            float barW = bw - 32 * s - 52 * s;
+            ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW, 14 * s), glm::vec4(1, 1, 1, 0.15f), 7 * s);
+            ui.Rect(glm::vec4(bx + 16 * s, by + 36 * s, barW * (hielo < 0.02f ? 0.02f : hielo), 14 * s), glm::vec4(cH, 1.0f), 7 * s);
+            snprintf(b, sizeof(b), "%d%%", (int)(hielo * 100.0f + 0.5f));
+            ui.Texto(b, bx + bw - 16 * s, by + 31 * s, 19 * s, glm::vec4(cH, 1.0f), 2);
+            ui.Texto("Hielo restante", bx + 16 * s, by + 52 * s, 11 * s, glm::vec4(0.7f, 0.85f, 0.95f, 0.9f), 0, false);
+            bool o1 = objCalor, o2 = objFantasma, o3 = (int)fotos.size() >= TOTAL_FOTOS, o4 = (int)alimentados.size() >= TOTAL_ALIMENTADOS;
+            bool o5 = o1 && o2 && o3 && o4 && hielo >= 0.95f;
+            glm::vec4 cOk(0.5f, 1.0f, 0.6f, 1.0f), cNo(0.95f, 0.95f, 0.95f, 1.0f);
+            float y0 = by + 72 * s, dy = 22 * s;
+            ui.Texto(o1 ? "[x] Calienta (T) y derrite la mitad del hielo" : "[ ] Calienta (T) y derrite la mitad del hielo", bx + 16 * s, y0, 14 * s, o1 ? cOk : cNo, 0, false);
+            ui.Texto(o2 ? "[x] Fotografía a un animal fantasma (X)" : "[ ] Fotografía a un animal fantasma (X)", bx + 16 * s, y0 + dy, 14 * s, o2 ? cOk : cNo, 0, false);
+            snprintf(b, sizeof(b), "%s Fotografía las 14 especies: %d/%d", o3 ? "[x]" : "[ ]", (int)fotos.size(), TOTAL_FOTOS);
+            ui.Texto(b, bx + 16 * s, y0 + 2 * dy, 14 * s, o3 ? cOk : cNo, 0, false);
+            snprintf(b, sizeof(b), "%s Alimenta a 4 animales: %d/%d", o4 ? "[x]" : "[ ]", (int)alimentados.size(), TOTAL_ALIMENTADOS);
+            ui.Texto(b, bx + 16 * s, y0 + 3 * dy, 14 * s, o4 ? cOk : cNo, 0, false);
+            ui.Texto(o5 ? "[x] Enfría (G) y restaura el hielo al 95 %" : "[ ] Enfría (G) y restaura el hielo al 95 %", bx + 16 * s, y0 + 4 * dy, 14 * s, o5 ? cOk : cNo, 0, false);
+            snprintf(b, sizeof(b), "Bolsa: krill %d · pescado %d", krillMochila, pescadoMochila);
+            ui.Texto(b, bx + 16 * s, y0 + 5 * dy + 2 * s, 12 * s, glm::vec4(1.0f, 0.85f, 0.6f, 1.0f), 0, false);
 
+        }
+        else {                    // pantalla limpia: version compacta
+            bool o1 = objCalor, o2 = objFantasma, o3 = (int)fotos.size() >= TOTAL_FOTOS, o4 = (int)alimentados.size() >= TOTAL_ALIMENTADOS;
+            bool o5 = o1 && o2 && o3 && o4 && hielo >= 0.95f;
+            char tx[96];
+            if (!o1) snprintf(tx, sizeof(tx), "Calienta el agua (T) y derrite la mitad del hielo");
+            else if (!o2) snprintf(tx, sizeof(tx), "Fotografía a un animal fantasma (X)");
+            else if (!o3) snprintf(tx, sizeof(tx), "Fotografía las especies (X): %d/%d", (int)fotos.size(), TOTAL_FOTOS);
+            else if (!o4) snprintf(tx, sizeof(tx), "Alimenta animales (clic en krill o pescado): %d/%d", (int)alimentados.size(), TOTAL_ALIMENTADOS);
+            else if (!o5) snprintf(tx, sizeof(tx), "Enfría el agua (G) y restaura el hielo al 95%%");
+            else snprintf(tx, sizeof(tx), "¡Objetivos completos!");
+            char ex[96]; snprintf(ex, sizeof(ex), "Hielo %d%% · bolsa: krill %d, pescado %d", (int)(hielo * 100.0f + 0.5f), krillMochila, pescadoMochila);
+            HUDObjetivo(ui, tx, (int)o1 + (int)o2 + (int)o3 + (int)o4 + (int)o5, 5, ex);
+        }
         // ---------------- avisos (arriba al centro)
         float ay = 92.0f * s;
-        for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < 2; i--, n++) {
+        for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < (HUD().detallado ? 2 : 1); i--, n++) {
             const AvisoHUD& a = avisos[i];
             float alfa = a.vida < 0.6f ? a.vida / 0.6f : (a.total - a.vida < 0.3f ? (a.total - a.vida) / 0.3f : 1.0f);
             std::vector<std::string> ls = ui.Lineas(a.texto, 600.0f * s, 16.0f * s, true);
@@ -332,20 +370,24 @@ public:
             ay += ah + 8 * s;
         }
 
-        // ---------------- ayuda de controles (primeros 20 segundos)
-        float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
-        if (ayuda > 0.0f) {
-            float x0 = bx + bw + 18 * s, x1 = px - 18 * s, aw = x1 - x0;
-            const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  Clic ver ficha  ·  Esc menú";
-            const char* l2 = "T / G temperatura  ·  X foto  ·  Clic en krill o pescado para recogerlos y en un animal para alimentarlo";
-            std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
-            float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, ay2 = H - 18 * s - ah;
-            ui.Rect(glm::vec4(x0, ay2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
-            float yy = ay2 + 10 * s;
-            for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); yy += lh; }
-            for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); yy += lh; }
-        }
+        if (HUD().detallado) {   // panel completo: tecla H
+            // ---------------- ayuda de controles (primeros 20 segundos)
+            float bx = 18.0f * s, bw = 330.0f * s, px = W - 150.0f * s - 18.0f * s;   // paneles de objetivos y termometro (la ayuda va entre ellos)
+            float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
+            if (ayuda > 0.0f) {
+                float x0 = bx + bw + 18 * s, x1 = px - 18 * s, aw = x1 - x0;
+                const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  Clic ver ficha  ·  Esc menú";
+                const char* l2 = "T / G temperatura  ·  X foto  ·  Clic en krill o pescado para recogerlos y en un animal para alimentarlo";
+                std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
+                float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, ay2 = H - 18 * s - ah;
+                ui.Rect(glm::vec4(x0, ay2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
+                float yy = ay2 + 10 * s;
+                for (auto& l : a1) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(0.88f, 0.94f, 1.0f, ayuda), 1, false); yy += lh; }
+                for (auto& l : a2) { ui.Texto(l, x0 + aw * 0.5f, yy, 14 * s, glm::vec4(1.0f, 0.8f, 0.5f, ayuda), 1, true); yy += lh; }
+            }
 
+        }
+        HUDPistaTeclas(ui);
         // ---------------- marco de camara y flash (ACTIVIDAD 3)
         if (marco > 0.0f) {
             float a = marco > 0.3f ? 1.0f : marco / 0.3f;

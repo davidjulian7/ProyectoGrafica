@@ -75,6 +75,8 @@ src/bin/models/zonas/<zona>/   modelos .fbx y sus texturas
 | **Texto de las indicaciones de una zona** | `zonas/<zona>/<zona>_mecanica.h` | función `Intro()` |
 | **Tiempo para pasar a la siguiente zona** | `ProyectoFinal.cpp` | `ESPERA_SIGUIENTE` |
 | **Movimiento de piernas del buzo** | `bin/shaders/<zona>/objetos.vs` | `if (uBuzo == 1)`: amplitud `0.14 + 0.38` |
+| **Fotos de las tarjetas del menú** | `bin/textures/menu/` | reemplaza `foto_zona1_arrecifes.jpg`, etc. (960 × 1200, formato 4:5) |
+| **Animación y textos de las tarjetas** | `interfaz/menu.h` | `DibujarTarjetaFoto()`: zoom, paneo, textos · destello en `bin/shaders/menu_ui.fs` (modo 4) |
 | **Agregar una tecla** | `ProyectoFinal.cpp` | plantilla `[AGREGAR]` dentro de `key_callback` |
 | **Ficha educativa nueva** | `interfaz/fichas.h` | copia una línea del mapa (la clave es la `etiqueta` del objeto) |
 | **Temperaturas de la Zona 1 / 2** | `zonas/<zona>/<zona>_mecanica.h` | constantes `T_MIN`, `T_MAX`, `T_UMBRAL`… |

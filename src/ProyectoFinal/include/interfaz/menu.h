@@ -88,9 +88,10 @@ public:
         fondo = new Shader("shaders/menu_fondo.vs", "shaders/menu_fondo.fs");
         ui = new Shader("shaders/menu_ui.vs", "shaders/menu_ui.fs");
 
-        tarjetas[0] = menuCargarTextura("textures/menu/zona1_arrecifes.png");
-        tarjetas[1] = menuCargarTextura("textures/menu/zona2_aguas_frias.png");
-        tarjetas[2] = menuCargarTextura("textures/menu/zona3_naufragios.png");
+        // [CAMBIAR] fotos de las tarjetas: capturas reales de cada zona (960 x 1200, formato 4:5)
+        tarjetas[0] = menuCargarTextura("textures/menu/foto_zona1_arrecifes.jpg");
+        tarjetas[1] = menuCargarTextura("textures/menu/foto_zona2_aguas_frias.jpg");
+        tarjetas[2] = menuCargarTextura("textures/menu/foto_zona3_naufragios.jpg");
         hud[0] = menuCargarTextura("textures/menu/hud_zona1.png");
         hud[1] = menuCargarTextura("textures/menu/hud_zona2.png");
         hud[2] = menuCargarTextura("textures/menu/hud_zona3.png");
@@ -256,7 +257,7 @@ public:
             }
             float brillo = (hayFoco && h < 0.5f) ? 0.62f + 0.38f * h : 1.0f + 0.10f * h;
             glm::vec4 borde = glm::vec4(glm::mix(glm::vec3(0.75f, 0.9f, 1.0f), acentos[i], h), 0.25f + 0.75f * h);
-            DibujarImagen(tarjetas[i], rr, radio, (2.0f + 2.0f * h) * escala, borde, aparece, brillo);
+            DibujarTarjetaFoto(i, rr, radio, (2.0f + 2.0f * h) * escala, borde, aparece, brillo, h, tiempo);
         }
 
         // Indicaciones inferiores con pulso suave
@@ -641,6 +642,46 @@ private:
         float y0 = zonaArriba + (altoDisp - tarjH) * 0.5f;
         for (int i = 0; i < NUM_ZONAS; i++)
             rectTarjeta[i] = glm::vec4(x0 + i * (tarjW + hueco), y0, tarjW, tarjH);
+    }
+
+    // Tarjeta del menu: foto real de la zona con movimiento lento (acercamiento y paneo tipo "Ken Burns"),
+    // destello al enfocarla y los textos encima con la tipografia del juego.
+    void DibujarTarjetaFoto(int i, glm::vec4 r, float radio, float borde, glm::vec4 colorBorde, float alpha, float brillo, float h, float tiempo)
+    {
+        const MenuTextura& t = tarjetas[i];
+        if (!t.id || alpha <= 0.001f) return;
+        // [CAMBIAR] movimiento de la foto: zoom base 1.10, oscila +-0.035 y se acerca 0.06 mas al enfocar
+        float zoom = 1.10f + 0.035f * sinf(tiempo * 0.13f + i * 2.1f) + 0.06f * h;
+        float w = 1.0f / zoom;
+        float u0 = (1.0f - w) * (0.5f + 0.45f * sinf(tiempo * 0.09f + i * 1.3f));
+        float v0 = (1.0f - w) * (0.5f + 0.45f * cosf(tiempo * 0.11f + i * 1.7f));
+        glBindTexture(GL_TEXTURE_2D, t.id);
+        ui->setVec4("uUV", glm::vec4(u0, v0, w, w));
+        ui->setInt("uMode", 4);
+        ui->setVec4("uRect", r);
+        ui->setVec2("uSize", glm::vec2(r.z, r.w));
+        ui->setFloat("uRadius", radio);
+        ui->setFloat("uBorder", borde);
+        ui->setVec4("uColor", colorBorde);
+        ui->setFloat("uAlpha", alpha);
+        ui->setFloat("uBright", brillo);
+        ui->setFloat("uTime", tiempo + i * 0.9f);
+        ui->setFloat("uFoco", h);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // textos de la tarjeta
+        static const char* zonas[] = { "ZONA 1", "ZONA 2", "ZONA 3" };
+        static const char* nombres[] = { "ARRECIFES", "AGUAS FRÍAS", "NAUFRAGIOS" };
+        static const char* temas[] = { "Estrés térmico y blanqueamiento", "Deshielo y cadenas tróficas", "Huella humana y contaminación" };
+        float s = r.z / 400.0f, x = r.x + 28.0f * s, yb = r.y + r.w;
+        glm::vec3 ac = acentos[i];
+        Texto(zonas[i], x, yb - 132.0f * s, 17.0f * s, glm::vec4(ac, alpha));
+        DibujarColor(glm::vec4(x, yb - 108.0f * s, (40.0f + 40.0f * h) * s, 3.0f * s), glm::vec4(ac, alpha), 1.5f * s, 1.0f);
+        Texto(nombres[i], x, yb - 100.0f * s, 46.0f * s, glm::vec4(1.0f, 1.0f, 1.0f, alpha));
+        Texto(temas[i], x, yb - 46.0f * s, 18.0f * s, glm::vec4(0.82f, 0.9f, 0.97f, alpha), 0, false);
+        if (h > 0.02f) {   // al enfocar: invitacion a entrar
+            Texto("Sumergirse  →", r.x + r.z - 24.0f * s, r.y + 22.0f * s, 16.0f * s, glm::vec4(1.0f, 0.95f, 0.85f, alpha * h), 2);
+        }
     }
 
     void DibujarImagen(const MenuTextura& t, glm::vec4 r, float radio, float borde, glm::vec4 colorBorde, float alpha, float brillo)

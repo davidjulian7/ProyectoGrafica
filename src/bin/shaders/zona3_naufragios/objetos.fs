@@ -21,6 +21,7 @@ uniform vec3  uTinte;
 uniform float uAlpha;
 uniform float uEmision;
 uniform float uResaltado;   // brillo del objeto bajo la mira
+uniform float uPista;       // pista amarilla: se puede interactuar con este objeto (nivel de uso)
 uniform float uBlanqueo;    // 0..1 coral sano -> blanqueado (Zona 1)
 uniform float uFantasma;    // 0..1 animal real -> fantasma (Zona 2)
 uniform float uMuerte;      // 0..1 coral muerto cubierto de algas (Zona 1)
@@ -124,6 +125,11 @@ void main()
         alpha = mix(alpha, 0.20 + borde * 0.7, uFantasma);
     }
     color += vec3(0.25, 0.55, 0.65) * uResaltado;
+    // nivel de uso basico/intermedio: borde dorado que late en los objetos interactivos
+    if (uPista > 0.0) {
+        float bordeP = pow(1.0 - max(dot(N, V), 0.0), 2.0);
+        color += vec3(1.0, 0.80, 0.20) * uPista * (0.25 + 1.2 * bordeP);
+    }
 
     // niebla submarina: el color hacia el que se pierde depende de hacia donde se mira
     float dist = length(uCamPos - vPosMundo);

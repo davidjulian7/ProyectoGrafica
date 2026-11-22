@@ -12,6 +12,18 @@ Un recorrido submarino en primera persona, hecho en **C++ y OpenGL 3.3**, donde 
 
 Desde el menú se elige una zona (Enter empieza en la Zona 1). Al entrar, una tarjeta explica la historia, los objetivos y los controles. Al completar los objetivos aparece **"Siguiente zona"** y el buzo pasa solo a la siguiente: **Arrecifes → Aguas Frías → Naufragios → ¡Recorrido completado!**
 
+### Niveles de uso
+
+Antes de entrar se elige el **nivel de uso** debajo de las tarjetas del menú (clic o **↑ / ↓**). Cambia cuánta guía recibe el usuario, como plantea el documento *Usuarios e interacción*:
+
+| Nivel | Tarjeta al entrar | Pista amarilla en objetos interactivos | Teclas en el borde | Objetivo arriba a la izquierda |
+|---|---|---|---|---|
+| **Básico** (novato) | Sí, en cada zona | En todos | Siempre | Qué hacer y cómo |
+| **Intermedio** | No | Solo en los cercanos (12 m) | Siempre | Qué hacer y cómo |
+| **Avanzado** (experto) | No | Ninguna | Solo si el buzo se queda quieto 8 s | Solo el avance (n/total) |
+
+Dentro de una zona, **U** cambia de nivel sin salir.
+
 La pantalla se mantiene limpia: solo se ve el objetivo actual, el indicador de la zona (termómetro o limpieza) y un aviso a la vez. Con **H** se muestran todos los paneles y con **I** la ficha completa del animal que señala la mira.
 
 ## 🐠 Las tres zonas
@@ -89,6 +101,8 @@ El ejecutable se genera en `src/bin/ProyectoFinal.exe`, junto a los recursos, y 
 | Tecla / acción | Función |
 |---|---|
 | **1 / 2 / 3** o clic en la tarjeta | Elegir zona en el menú |
+| **↑ / ↓** o clic en el botón | Elegir nivel de uso en el menú (Básico, Intermedio, Avanzado) |
+| **U** | Cambiar el nivel de uso dentro de una zona |
 | **W A S D** | Nadar |
 | **Espacio / Ctrl** | Subir / bajar |
 | **Shift** | Aletear con más fuerza |

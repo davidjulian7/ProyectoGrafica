@@ -45,6 +45,7 @@ inline void Escenario::Comunes(const glm::vec3& tinte, float ondula, float largo
     sh->setFloat("uAlpha", alpha);
     sh->setFloat("uEmision", emision);
     sh->setFloat("uResaltado", 0.0f);
+    sh->setFloat("uPista", 0.0f);      // pista amarilla del nivel de uso (la pone DibujarElemento)
     sh->setFloat("uBlanqueo", 0.0f);
     sh->setFloat("uMuerte", 0.0f);
     sh->setFloat("uFantasma", 0.0f);

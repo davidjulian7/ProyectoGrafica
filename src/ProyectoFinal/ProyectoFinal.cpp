@@ -98,6 +98,7 @@ float tSiguiente = -1.0f;            // segundos desde que se completo la zona (
 bool recorridoTerminado = false;     // se completaron las tres zonas: pantalla final
 void AvanzarRecorrido();
 void CerrarIntro();
+std::vector<std::string> TeclasZona();   // teclas que se muestran en el borde segun el nivel de uso
 
 Escenario escenario;        // zonas de inmersión (include/zonas.h)
 MecanicaArrecife arrecife;  // mecánica de la Zona 1 (include/arrecife.h)
@@ -363,6 +364,9 @@ bool Update() {
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
 	if (HUD().intro) HUD().introTiempo += deltaTime;
 	if (!inspeccion && !HUD().intro) processInput(window);
+	// Nivel de uso avanzado: cuenta cuanto tiempo lleva el buzo sin nadar (el raton y las teclas lo reinician)
+	if (HUD().intro || glm::length(diverVelocity) > 0.3f) HUD().quieto = 0.0f;
+	else HUD().quieto += deltaTime;
 	if (escenario.Actualizar(dtEscena, animTime, camera))
 		Efecto("sound/burbujas.wav", 0.35f);          // exhalación del buzo
 	if (estadoActual == ARRECIFES && !HUD().intro) {
@@ -468,6 +472,9 @@ bool Update() {
 	}
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
 	menuInicio.Comenzar(window);
+	// Nivel de uso: teclas en el borde (basico/intermedio siempre, avanzado solo si el buzo se queda quieto)
+	if (!HUD().intro && !recorridoTerminado && tSiguiente < 0.0f && !inspeccion)
+		HUDTeclasBorde(menuInicio, TeclasZona());
 	if (HUD().intro) {                                   // indicaciones al entrar a la zona
 		IntroZona in = estadoActual == ARRECIFES ? arrecife.Intro() : (estadoActual == AGUAS_FRIAS ? aguasFrias.Intro() : naufragio.Intro());
 		HUDIntro(menuInicio, in, HUD().introTiempo);
@@ -713,6 +720,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
 	lastX = (float)xpos;
 	lastY = (float)ypos;
+	if (fabsf(xoffset) + fabsf(yoffset) > 2.0f) HUD().quieto = 0.0f;   // mover la vista cuenta como actividad
 
 	camera.ProcessMouseMovement(xoffset, yoffset);
 
@@ -772,6 +780,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 	// Zona completada: Enter pasa a la siguiente sin esperar
 	if ((key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) && tSiguiente >= 0.0f) { AvanzarRecorrido(); return; }
+	HUD().quieto = 0.0f;   // cualquier tecla cuenta como actividad (nivel avanzado)
+	// Nivel de uso: U cambia Basico -> Intermedio -> Avanzado sin salir de la zona (interfaz/estado_hud.h)
+	if (key == GLFW_KEY_U) {
+		HUD().nivel = (HUD().nivel + 1) % NUM_NIVELES;
+		std::cout << ">> Nivel de uso: " << NombreNivel(HUD().nivel) << std::endl;
+		return;
+	}
 	// [CAMBIAR] H = mostrar/ocultar todos los paneles · I = ficha completa del objeto bajo la mira
 	if (key == GLFW_KEY_H) { HUD().detallado = !HUD().detallado; return; }
 	if (key == GLFW_KEY_I) { HUD().fichaAbierta = !HUD().fichaAbierta; return; }
@@ -871,7 +886,8 @@ void EntrarZona(int zona)
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	zonaFade = 1.0f;   // la zona aparece desde negro
-	HUD().intro = true; HUD().introTiempo = 0.0f; HUD().fichaAbierta = false;   // primero las indicaciones
+	// Nivel de uso: solo el BASICO recibe la tarjeta de indicaciones al entrar a cada zona
+	HUD().intro = (HUD().nivel == NIVEL_BASICO); HUD().introTiempo = 0.0f; HUD().fichaAbierta = false; HUD().quieto = 0.0f;
 	tSiguiente = -1.0f; recorridoTerminado = false;
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -886,6 +902,18 @@ void CerrarIntro()
 	HUD().intro = false;
 	firstMouse = true;
 	lastFrame = (float)glfwGetTime();
+}
+
+// Nivel de uso: teclas que se muestran en el borde de la pantalla (interfaz/hud_comun.h → HUDTeclasBorde)
+// [CAMBIAR] las teclas propias de cada zona
+std::vector<std::string> TeclasZona()
+{
+	IntroZona in = estadoActual == ARRECIFES ? arrecife.Intro() : (estadoActual == AGUAS_FRIAS ? aguasFrias.Intro() : naufragio.Intro());
+	std::vector<std::string> teclas = in.controles;
+	if (estadoActual == ARRECIFES)   teclas.push_back("↑ / ↓ temperatura · T calentamiento automático · R restaurar · L especies");
+	if (estadoActual == AGUAS_FRIAS) teclas.push_back("T calentar · G enfriar · X foto · R reiniciar");
+	if (estadoActual == NAUFRAGIOS)  teclas.push_back("Clic recoger basura · L especies");
+	return teclas;
 }
 
 // Recorrido: pasa a la siguiente zona o, despues de la ultima, a la pantalla final

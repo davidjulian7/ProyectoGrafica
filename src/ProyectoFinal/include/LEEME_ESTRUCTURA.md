@@ -45,6 +45,20 @@ src/bin/models/zonas/<zona>/   modelos .fbx y sus texturas
 - **Pantalla limpia:** por defecto solo se ve el objetivo actual, el termómetro o barra compacta y un aviso. **H** muestra todos los paneles e **I** la ficha completa. El estado está en `interfaz/estado_hud.h` (`HUD().detallado`, `HUD().fichaAbierta`); las versiones compactas son `HUDObjetivo`, `HUDTermometroCompacto` y `HUDBarraCompacta` (`interfaz/hud_comun.h`), y la etiqueta bajo la mira es `EtiquetaCompacta` (`interfaz/menu.h`).
 - **Animación del buzo:** patada de piernas y aletas, brazos y respiración en `bin/shaders/<zona>/objetos.vs` (bloque `if (uBuzo == 1)`); la fase y la rapidez se mandan en `escena/render.h`.
 
+## Niveles de uso (Básico, Intermedio, Avanzado)
+
+Salen del documento *Usuarios e interacción*: el novato recibe indicaciones al inicio de cada zona y una pista amarilla en lo interactivo; el intermedio solo ve las teclas en el borde y pistas en algunos modelos; el experto solo ve su avance y las teclas aparecen si se queda quieto.
+
+| Qué | Dónde |
+|---|---|
+| Nivel elegido, nombres, descripciones, distancia de la pista (12 m) y segundos quieto (8 s) | `interfaz/estado_hud.h` (`HUD().nivel`, `PISTA_DISTANCIA_INTERMEDIO`, `AYUDA_QUIETO_AVANZADO`) |
+| Botones del menú (clic, ↑ / ↓) | `interfaz/menu.h` → `DibujarSelectorNivel()`, `OnKey()`, `OnClick()`, `Layout()` |
+| Tarjeta al entrar (solo Básico) | `ProyectoFinal.cpp` → `EntrarZona()` |
+| Tecla **U** (cambiar de nivel en la zona) y tiempo quieto | `ProyectoFinal.cpp` → `key_callback`, `Update()`, `mouse_callback` |
+| Teclas en el borde | `interfaz/hud_comun.h` → `HUDTeclasBorde()` · las líneas en `ProyectoFinal.cpp` → `TeclasZona()` |
+| Solo el avance (Avanzado) | `interfaz/hud_comun.h` → `HUDObjetivo()` |
+| Pista amarilla en objetos interactivos | `escena/render.h` → `PistaNivel()` · color en `bin/shaders/<zona>/objetos.fs` (`uPista`) |
+
 ## ¿Qué me pueden pedir y dónde lo cambio?
 
 | Te piden… | Archivo | Qué buscar / cambiar |

@@ -5,6 +5,7 @@
 //   1) agua de fondo   2) terreno   3) objetos opacos   4) superficie del agua   5) transparentes y burbujas
 // [CAMBIAR] el orden o agregar un pase nuevo (por ejemplo un objeto con otro shader) dentro de Dibujar().
 // ============================================================================================
+#include <interfaz/estado_hud.h>   // nivel de uso: pista amarilla de los objetos interactivos
 
 inline void Escenario::Dibujar(const glm::mat4& proj, const glm::mat4& view, const Camera& cam, float t, int fbW, int fbH, const Camera* camBuzo, bool mostrarBuzo)
 {
@@ -197,9 +198,22 @@ inline void Escenario::DibujarElemento(const Elemento& e, int idx, float t)
         glm::mat4 M = Matriz(e, idx, k, t);
         if (!EnVista(glm::vec3(M[3]), e.radioBase * EscalaMax(M) * 1.15f)) continue;
         sh->setFloat("uFase", e.fase + k * 1.3f);
+        sh->setFloat("uPista", PistaNivel(e, idx, glm::vec3(M[3]), t));
         sh->setMat4("model", M);
         e.modelo->Draw(*sh, e.modelo->TieneAnimacion() ? t + e.fase + k * 0.37f : -1.0f);
     }
+    sh->setFloat("uPista", 0.0f);   // lo que se dibuje despues (terreno, buzo...) no lleva pista
+}
+
+// NIVELES DE USO · pista amarilla en los objetos con los que se puede interactuar (interfaz/estado_hud.h)
+//   basico: todos los interactivos · intermedio: solo los que estan cerca del buzo · avanzado: ninguno
+//   El objeto que ya senala la mira no la lleva (tiene su propio resaltado azul).
+// [CAMBIAR] intensidad del latido: 0.35f + 0.25f * sinf(...) · distancia: PISTA_DISTANCIA_INTERMEDIO
+inline float Escenario::PistaNivel(const Elemento& e, int idx, const glm::vec3& pos, float t) const
+{
+    if (!e.interactivo || idx == seleccion || HUD().nivel == NIVEL_AVANZADO) return 0.0f;
+    if (HUD().nivel == NIVEL_INTERMEDIO && glm::length(pos - cullPos) > PISTA_DISTANCIA_INTERMEDIO) return 0.0f;
+    return 0.35f + 0.25f * sinf(t * 3.0f + e.fase);
 }
 
 #endif

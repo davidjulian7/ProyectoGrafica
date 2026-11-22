@@ -129,8 +129,12 @@ inline void HUDIntro(MenuInicio& ui, const IntroZona& in, float segundos)
 }
 
 // Objetivo actual en una sola linea (arriba a la izquierda)
-inline void HUDObjetivo(MenuInicio& ui, const std::string& texto, int hechos, int total, const std::string& extra = std::string())
+// Nivel avanzado: solo el avance (hechos/total), sin decir que hacer ni como.
+inline void HUDObjetivo(MenuInicio& ui, const std::string& textoObjetivo, int hechos, int total, const std::string& extraObjetivo = std::string())
 {
+    bool soloAvance = HUD().nivel == NIVEL_AVANZADO;
+    std::string texto = soloAvance ? std::string(hechos >= total ? "¡Zona completa!" : "Avance de la zona") : textoObjetivo;
+    std::string extra = soloAvance ? std::string() : extraObjetivo;
     float s = ui.Escala();
     char b[32]; snprintf(b, sizeof(b), "%d/%d", hechos, total);
     float tw = ui.MedirTexto(texto, 15.0f * s, true);
@@ -185,10 +189,37 @@ inline void HUDSiguienteZona(MenuInicio& ui, const std::string& texto, float res
 }
 
 // Pista discreta de teclas de informacion (abajo a la derecha)
+// Nivel avanzado: solo aparece si el buzo se queda quieto (o con los paneles de H abiertos).
 inline void HUDPistaTeclas(MenuInicio& ui)
 {
+    float v = HUD().detallado ? 1.0f : VisibilidadTeclas();
+    if (v <= 0.0f) return;
     float s = ui.Escala(), W = ui.Ancho(), H = ui.Alto();
-    ui.Texto(HUD().detallado ? "H: ocultar ayuda" : "H: ayuda  ·  I: ficha", W - 18 * s, H - 30 * s, 12 * s, glm::vec4(0.8f, 0.9f, 1.0f, 0.55f), 2, false);
+    ui.Texto(HUD().detallado ? "H: ocultar ayuda" : "H: ayuda  ·  I: ficha  ·  U: nivel", W - 18 * s, H - 30 * s, 12 * s, glm::vec4(0.8f, 0.9f, 1.0f, 0.55f * v), 2, false);
+}
+
+// ============================================================================================
+// NIVELES DE USO · teclas en el borde de la pantalla (abajo a la izquierda)
+//   basico e intermedio: siempre visibles · avanzado: solo si el buzo se queda quieto
+//   (AYUDA_QUIETO_AVANZADO segundos en interfaz/estado_hud.h). Con H se ocultan porque ya
+//   se ve la ayuda completa.
+// [CAMBIAR] las lineas salen de TeclasZona() en ProyectoFinal.cpp
+// ============================================================================================
+inline void HUDTeclasBorde(MenuInicio& ui, const std::vector<std::string>& lineas)
+{
+    if (HUD().detallado || lineas.empty()) return;
+    float v = VisibilidadTeclas();
+    if (v <= 0.0f) return;
+    float s = ui.Escala(), H = ui.Alto();
+    float tam = 12.0f * s, lh = tam * 1.45f, w = 0.0f;
+    for (const std::string& l : lineas) { float m = ui.MedirTexto(l, tam, false); w = m > w ? m : w; }
+    w += 28.0f * s;
+    float h = lineas.size() * lh + 34.0f * s, x = 18.0f * s, y = H - h - 18.0f * s;
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.55f * v), 10.0f * s);
+    char titulo[48]; snprintf(titulo, sizeof(titulo), "TECLAS  ·  NIVEL %s", NombreNivel(HUD().nivel));
+    ui.Texto(titulo, x + 14 * s, y + 9 * s, 11 * s, glm::vec4(1.0f, 0.82f, 0.35f, 0.95f * v), 0);
+    float yy = y + 28 * s;
+    for (const std::string& l : lineas) { ui.Texto(l, x + 14 * s, yy, tam, glm::vec4(0.88f, 0.94f, 1.0f, 0.9f * v), 0, false); yy += lh; }
 }
 
 #endif

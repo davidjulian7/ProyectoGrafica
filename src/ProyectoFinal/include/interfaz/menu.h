@@ -146,6 +146,9 @@ public:
         else if (key == GLFW_KEY_3 || key == GLFW_KEY_KP_3) Confirmar(2);
         else if (key == GLFW_KEY_LEFT || key == GLFW_KEY_A) foco = foco <= 0 ? NUM_ZONAS - 1 : foco - 1;
         else if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_D) foco = (foco + 1) % NUM_ZONAS;
+        // Nivel de uso (interfaz/estado_hud.h): flechas arriba / abajo
+        else if (key == GLFW_KEY_UP || key == GLFW_KEY_W) HUD().nivel = (HUD().nivel + NUM_NIVELES - 1) % NUM_NIVELES;
+        else if (key == GLFW_KEY_DOWN || key == GLFW_KEY_S) HUD().nivel = (HUD().nivel + 1) % NUM_NIVELES;
         else if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_SPACE)
             Confirmar(foco < 0 ? 0 : foco);
     }
@@ -154,6 +157,7 @@ public:
     void OnClick()
     {
         if (confirmada >= 0) return;
+        if (nivelSobre >= 0) { HUD().nivel = nivelSobre; return; }   // boton de nivel de uso
         if (cursorSobre >= 0) Confirmar(cursorSobre);
     }
 
@@ -177,6 +181,11 @@ public:
         for (int i = 0; i < NUM_ZONAS; i++) {
             glm::vec4 r = rectTarjeta[i];
             if (cursor.x >= r.x && cursor.x <= r.x + r.z && cursor.y >= r.y && cursor.y <= r.y + r.w) cursorSobre = i;
+        }
+        nivelSobre = -1;
+        for (int i = 0; i < NUM_NIVELES; i++) {
+            glm::vec4 r = rectNivel[i];
+            if (cursor.x >= r.x && cursor.x <= r.x + r.z && cursor.y >= r.y && cursor.y <= r.y + r.w) nivelSobre = i;
         }
         // El raton solo cambia el foco cuando se mueve (asi el teclado tambien funciona)
         if (glm::length(cursor - ultimoCursor) > 1.0f && ultimoCursor.x >= 0.0f && confirmada < 0)
@@ -259,6 +268,8 @@ public:
             glm::vec4 borde = glm::vec4(glm::mix(glm::vec3(0.75f, 0.9f, 1.0f), acentos[i], h), 0.25f + 0.75f * h);
             DibujarTarjetaFoto(i, rr, radio, (2.0f + 2.0f * h) * escala, borde, aparece, brillo, h, tiempo);
         }
+
+        DibujarSelectorNivel(Suave((tiempoEntrada - 0.5f) / 0.5f));
 
         // Indicaciones inferiores con pulso suave
         float pulso = 0.75f + 0.25f * sinf(tiempo * 2.0f);
@@ -599,6 +610,32 @@ private:
 
     float fbW = 1024.0f, fbH = 768.0f, escala = 1.0f;
     glm::vec4 rectTitulo, rectPie, rectTarjeta[NUM_ZONAS];
+    glm::vec4 rectNivel[NUM_NIVELES];   // botones del nivel de uso (Basico / Intermedio / Avanzado)
+    int nivelSobre = -1;                // boton de nivel bajo el cursor
+
+    // NIVELES DE USO: tres botones debajo de las tarjetas (clic o flechas arriba/abajo) y la descripcion del elegido
+    // [CAMBIAR] textos en interfaz/estado_hud.h (NombreNivel, DescripcionNivel) · tamano y posicion en Layout()
+    void DibujarSelectorNivel(float alpha)
+    {
+        if (alpha <= 0.0f) return;
+        glm::vec3 dorado(1.0f, 0.82f, 0.35f);
+        float x0 = rectNivel[0].x;
+        Texto("NIVEL DE USO", x0 - 14.0f * escala, rectNivel[0].y + 9.0f * escala, 13.0f * escala, glm::vec4(0.85f, 0.93f, 1.0f, 0.9f * alpha), 2);
+        for (int i = 0; i < NUM_NIVELES; i++) {
+            glm::vec4 r = rectNivel[i];
+            bool elegido = HUD().nivel == i, sobre = nivelSobre == i;
+            if (elegido) DibujarBrillo(glm::vec4(r.x - 8 * escala, r.y - 8 * escala, r.z + 16 * escala, r.w + 16 * escala),
+                                      glm::vec4(dorado, 0.45f), r.w * 0.5f, 8 * escala, alpha);
+            glm::vec4 fondoBoton = elegido ? glm::vec4(dorado, 0.95f) : glm::vec4(0.01f, 0.07f, 0.12f, sobre ? 0.85f : 0.62f);
+            DibujarColor(r, fondoBoton, r.w * 0.5f, alpha);
+            glm::vec4 colorTexto = elegido ? glm::vec4(0.02f, 0.06f, 0.10f, alpha) : glm::vec4(0.88f, 0.94f, 1.0f, (sobre ? 1.0f : 0.8f) * alpha);
+            Texto(NombreNivel(i), r.x + r.z * 0.5f, r.y + 8.0f * escala, 14.0f * escala, colorTexto, 1, true, !elegido);
+        }
+        Texto(DescripcionNivel(HUD().nivel), fbW * 0.5f, rectNivel[0].y + rectNivel[0].w + 9.0f * escala, 13.0f * escala,
+              glm::vec4(0.85f, 0.93f, 1.0f, 0.9f * alpha), 1, false);
+        Texto("↑ ↓", rectNivel[NUM_NIVELES - 1].x + rectNivel[NUM_NIVELES - 1].z + 14.0f * escala, rectNivel[0].y + 9.0f * escala,
+              13.0f * escala, glm::vec4(0.85f, 0.93f, 1.0f, 0.6f * alpha), 0);
+    }
 
     void Confirmar(int i)
     {
@@ -631,7 +668,12 @@ private:
         rectPie = glm::vec4((fbW - pieW) * 0.5f, fbH * 0.955f - pieH, pieW, pieH);
 
         float zonaArriba = rectTitulo.y + tituloH + fbH * 0.035f;
-        float zonaAbajo = rectPie.y - fbH * 0.035f;
+        float altoNivel = 70.0f * escala;                     // espacio para el selector de nivel de uso
+        float zonaAbajo = rectPie.y - fbH * 0.035f - altoNivel;
+        float bw = 150.0f * escala, bh = 32.0f * escala, bg = 12.0f * escala;
+        float bx0 = (fbW - (NUM_NIVELES * bw + (NUM_NIVELES - 1) * bg)) * 0.5f;
+        for (int i = 0; i < NUM_NIVELES; i++)
+            rectNivel[i] = glm::vec4(bx0 + i * (bw + bg), zonaAbajo + 10.0f * escala, bw, bh);
         float altoDisp = zonaAbajo - zonaArriba;
         float hueco = fbW * 0.03f;
         float tarjW = (fbW * 0.86f - 2.0f * hueco) / 3.0f;

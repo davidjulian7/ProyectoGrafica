@@ -366,6 +366,7 @@ private:
     }
 
     void DibujarElemento(const Elemento& e, int idx, float t);   // -> escena/render.h
+    float PistaNivel(const Elemento& e, int idx, const glm::vec3& pos, float t) const;   // -> escena/render.h (niveles de uso)
 
     // ------------------------------------------------------------ fabricas
     // Presets de material Phong (rúbrica: opaco, plástico, traslúcido, metálico)

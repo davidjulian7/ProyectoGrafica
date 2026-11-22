@@ -216,7 +216,7 @@ inline void HUDTeclasBorde(MenuInicio& ui, const std::vector<std::string>& linea
     w += 28.0f * s;
     float h = lineas.size() * lh + 34.0f * s, x = 18.0f * s, y = H - h - 18.0f * s;
     ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.55f * v), 10.0f * s);
-    char titulo[48]; snprintf(titulo, sizeof(titulo), "TECLAS  ·  NIVEL %s", NombreNivel(HUD().nivel));
+    const char* titulo = "CONTROLES";   // [CAMBIAR] titulo del panel de teclas
     ui.Texto(titulo, x + 14 * s, y + 9 * s, 11 * s, glm::vec4(1.0f, 0.82f, 0.35f, 0.95f * v), 0);
     float yy = y + 28 * s;
     for (const std::string& l : lineas) { ui.Texto(l, x + 14 * s, yy, tam, glm::vec4(0.88f, 0.94f, 1.0f, 0.9f * v), 0, false); yy += lh; }

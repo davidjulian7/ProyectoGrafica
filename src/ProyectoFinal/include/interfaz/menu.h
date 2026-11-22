@@ -307,13 +307,7 @@ public:
         glBindVertexArray(vaoQuad);
         glActiveTexture(GL_TEXTURE0);
 
-        const MenuTextura& t = hud[zona - 1];
-        float w = menuMin(360.0f * escala, fbW * 0.45f);
-        float h = w * (float)t.alto / menuMax(1.0f, (float)t.ancho);
-        // [CAMBIAR] la insignia "ZONA N" se ve al llegar y se desvanece a los 6 s (con H se queda visible)
-        float insignia = HUD().detallado ? 1.0f : 1.0f - Suave((tiempoEnZona - 6.0f) / 1.5f);
-        if (insignia > 0.0f && !HUD().intro)
-            DibujarImagen(t, glm::vec4(18.0f * escala, (HUD().detallado ? 18.0f : 70.0f) * escala, w, h), 0.0f, 0.0f, glm::vec4(0.0f), 0.92f * insignia, 1.0f);
+        // (la insignia "ZONA N" se quito: se encimaba con los avisos; la zona ya se ve en el titulo de la ventana)
 
         // ayuda de controles: solo con la tecla H (las indicaciones ya se dieron al entrar)
         float ayuda = HUD().detallado ? 1.0f : 0.0f;
@@ -449,6 +443,27 @@ public:
             if (m != f.met.end()) x += m->second.z * k;
         }
         return x;
+    }
+
+    // Limites verticales de la tinta (sin espacios) respecto a 'y' de Texto(); sirve para centrar texto en un boton
+    void LimitesTinta(const std::string& s, float tam, bool usarNegrita, float& arriba, float& abajo)
+    {
+        MenuFuente& f = usarNegrita ? negrita : normal;
+        float k = tam / f.base; arriba = 1e9f; abajo = -1e9f;
+        for (size_t i = 0; i < s.size(); ) {
+            int cp = SiguienteLetra(s, i);
+            auto r = f.rect.find(cp); auto m = f.met.find(cp);
+            if (cp == ' ' || r == f.rect.end() || m == f.met.end()) continue;
+            arriba = menuMin(arriba, m->second.y * k);
+            abajo = menuMax(abajo, (m->second.y + r->second.w) * k);
+        }
+        if (arriba > abajo) { arriba = 0.0f; abajo = tam; }
+    }
+    // y para que un texto en mayusculas quede centrado en vertical alrededor de 'centroY'
+    float YCentrada(float centroY, float tam, bool usarNegrita = true)
+    {
+        float a, b; LimitesTinta("NIVEL", tam, usarNegrita, a, b);   // referencia: mayusculas sin acentos
+        return centroY - (a + b) * 0.5f;
     }
 
     // Dibuja texto. y = parte superior de la linea. alinear: 0 izquierda, 1 centro, 2 derecha
@@ -613,14 +628,15 @@ private:
     glm::vec4 rectNivel[NUM_NIVELES];   // botones del nivel de uso (Basico / Intermedio / Avanzado)
     int nivelSobre = -1;                // boton de nivel bajo el cursor
 
-    // NIVELES DE USO: tres botones debajo de las tarjetas (clic o flechas arriba/abajo) y la descripcion del elegido
+    // NIVELES DE USO: tres botones debajo de las tarjetas (clic o flechas arriba/abajo)
     // [CAMBIAR] textos en interfaz/estado_hud.h (NombreNivel, DescripcionNivel) · tamano y posicion en Layout()
     void DibujarSelectorNivel(float alpha)
     {
         if (alpha <= 0.0f) return;
         glm::vec3 dorado(1.0f, 0.82f, 0.35f);
         float x0 = rectNivel[0].x;
-        Texto("NIVEL DE USO", x0 - 14.0f * escala, rectNivel[0].y + 9.0f * escala, 13.0f * escala, glm::vec4(0.85f, 0.93f, 1.0f, 0.9f * alpha), 2);
+        float cy = rectNivel[0].y + rectNivel[0].w * 0.5f;   // centro vertical de los botones
+        Texto("NIVEL DE USO", x0 - 14.0f * escala, YCentrada(cy, 13.0f * escala), 13.0f * escala, glm::vec4(0.85f, 0.93f, 1.0f, 0.9f * alpha), 2);
         for (int i = 0; i < NUM_NIVELES; i++) {
             glm::vec4 r = rectNivel[i];
             bool elegido = HUD().nivel == i, sobre = nivelSobre == i;
@@ -629,12 +645,8 @@ private:
             glm::vec4 fondoBoton = elegido ? glm::vec4(dorado, 0.95f) : glm::vec4(0.01f, 0.07f, 0.12f, sobre ? 0.85f : 0.62f);
             DibujarColor(r, fondoBoton, r.w * 0.5f, alpha);
             glm::vec4 colorTexto = elegido ? glm::vec4(0.02f, 0.06f, 0.10f, alpha) : glm::vec4(0.88f, 0.94f, 1.0f, (sobre ? 1.0f : 0.8f) * alpha);
-            Texto(NombreNivel(i), r.x + r.z * 0.5f, r.y + 8.0f * escala, 14.0f * escala, colorTexto, 1, true, !elegido);
+            Texto(NombreNivel(i), r.x + r.z * 0.5f, YCentrada(cy, 14.0f * escala), 14.0f * escala, colorTexto, 1, true, !elegido);
         }
-        Texto(DescripcionNivel(HUD().nivel), fbW * 0.5f, rectNivel[0].y + rectNivel[0].w + 9.0f * escala, 13.0f * escala,
-              glm::vec4(0.85f, 0.93f, 1.0f, 0.9f * alpha), 1, false);
-        Texto("↑ ↓", rectNivel[NUM_NIVELES - 1].x + rectNivel[NUM_NIVELES - 1].z + 14.0f * escala, rectNivel[0].y + 9.0f * escala,
-              13.0f * escala, glm::vec4(0.85f, 0.93f, 1.0f, 0.6f * alpha), 0);
     }
 
     void Confirmar(int i)
@@ -668,7 +680,7 @@ private:
         rectPie = glm::vec4((fbW - pieW) * 0.5f, fbH * 0.955f - pieH, pieW, pieH);
 
         float zonaArriba = rectTitulo.y + tituloH + fbH * 0.035f;
-        float altoNivel = 70.0f * escala;                     // espacio para el selector de nivel de uso
+        float altoNivel = 50.0f * escala;                     // espacio para el selector de nivel de uso
         float zonaAbajo = rectPie.y - fbH * 0.035f - altoNivel;
         float bw = 150.0f * escala, bh = 32.0f * escala, bg = 12.0f * escala;
         float bx0 = (fbW - (NUM_NIVELES * bw + (NUM_NIVELES - 1) * bg)) * 0.5f;

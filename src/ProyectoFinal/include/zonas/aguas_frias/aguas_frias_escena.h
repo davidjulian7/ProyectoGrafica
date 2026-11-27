@@ -107,7 +107,8 @@ inline void Escenario::ConstruirAguasFrias()
         habitante("foca", "Foca", -30.0f, 18.0f, 1.4f, 2, 1.5f, 2.6f, 30.0f, 2.2f, 1.6f, 0.9f);
         size_t i3 = habitante("morsa", "Morsa", 28.0f, -24.0f, 1.2f, 2, 2.0f, 2.8f, 46.0f, 3.1f, 2.4f, 0.5f);
         elementos[i3].escala = 1.1f;
-        habitante("LeonMarino2", "Leon marino", -10.0f, -26.0f, 1.3f, 2, 1.8f, 2.6f, 26.0f, 4.0f, 1.3f, 1.4f);
+        size_t i2 = habitante("LeonMarino2", "Leon marino", -10.0f, -26.0f, 1.3f, 2, 1.8f, 2.6f, 26.0f, 4.0f, 1.3f, 1.4f);
+        elementos[i2].rotNado = glm::vec3(180.0f, 0.0f, -180.0f);
         size_t i5 = habitante("pinguino", "Pinguino", 8.0f, -32.0f, 1.0f, 4, 1.0f, 2.2f, 24.0f, 5.0f, 1.2f, 1.9f);
         elementos[i5].rotNado = glm::vec3(0.0f, 0.0f, -90.0f); elementos[i5].escala = 1.5f;
     }
@@ -137,10 +138,11 @@ inline void Escenario::ConstruirAguasFrias()
     calamar.ondula = 0.15f; calamar.velNado = 3.0f; calamar.oscAmp = 1.0f;
     elementos.push_back(calamar);
     Elemento leones = Nadador("LeonMarino2", c, MOV_CARDUMEN, glm::vec3(10.0f, 10.0f, 14.0f), 9.0f, 0.30f, "Leon marino");
-    leones.miembros = 3; leones.dispersion = 1.8f; leones.ondula = 0.10f; leones.velNado = 6.0f; leones.oscAmp = 1.0f;
+    leones.miembros = 3; leones.dispersion = 1.8f; leones.ondula = 0.10f; leones.velNado = 6.0f; leones.oscAmp = 1.0f; leones.rotExtra=glm::vec3(0.0f, 180.0f, 0.0f);
     elementos.push_back(leones);
     Elemento dracoides = Nadador("pezdracoide", "aguas_frias", MOV_CARDUMEN, glm::vec3(-2.0f, 4.0f, 14.0f), 6.0f, 0.35f, "Pez dracoide");
     dracoides.miembros = 6; dracoides.dispersion = 1.4f; dracoides.tinte = glm::vec3(0.75f, 0.9f, 1.1f);
+    dracoides.rotExtra = glm::vec3(0.0f, 0.0f, -180.0f);
     elementos.push_back(dracoides);
     fuentes.clear();
 }

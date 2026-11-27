@@ -357,7 +357,11 @@ public:
         if (hay) {
             const Ficha* f = BuscarFicha(etiqueta);
             if (f && negrita.tex.id && !HUD().fichaAbierta) EtiquetaCompacta(f->nombre, detalle, colorDetalle, cx, cy + 26.0f * escala);
-            else if (f && negrita.tex.id) TarjetaFicha(*f, cx, cy + 30.0f * escala, detalle, colorDetalle);
+            else if (f && negrita.tex.id) {
+                // con H hay paneles abajo a la izquierda (hasta x = 348): la ficha se recorre a su derecha
+                float cxFicha = HUD().detallado ? menuMax(cx, (18.0f + 330.0f + 18.0f + 235.0f) * escala) : cx;
+                TarjetaFicha(*f, cxFicha, cy + 30.0f * escala, detalle, colorDetalle);
+            }
             else {
                 const MenuTextura& t = Etiqueta(etiqueta);
                 if (t.id) {

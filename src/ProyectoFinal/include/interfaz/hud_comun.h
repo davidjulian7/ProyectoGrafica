@@ -182,7 +182,8 @@ inline void HUDSiguienteZona(MenuInicio& ui, const std::string& texto, float res
 {
     float s = ui.Escala(), W = ui.Ancho(), H = ui.Alto();
     char b[160]; snprintf(b, sizeof(b), "%s  ·  Enter para continuar (%d s)", texto.c_str(), (int)ceilf(restante > 0 ? restante : 0));
-    float w = ui.MedirTexto(b, 17.0f * s, true) + 50.0f * s, h = 46.0f * s, x = (W - w) * 0.5f, y = H - h - 26.0f * s;
+    float w = ui.MedirTexto(b, 17.0f * s, true) + 50.0f * s, h = 46.0f * s, x = (W - w) * 0.5f;
+    float y = HUD().detallado ? 24.0f * s : H - h - 44.0f * s;   // con H abajo estan los paneles de la zona
     float pulso = 0.35f + 0.25f * sinf(t * 4.0f);
     ui.Resplandor(glm::vec4(x - 10 * s, y - 10 * s, w + 20 * s, h + 20 * s), glm::vec4(1.0f, 0.82f, 0.35f, pulso), 16 * s, 12 * s);
     ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.06f, 0.10f, 0.92f), 14.0f * s);

@@ -392,7 +392,8 @@ public:
             float bx = 18.0f * s, bw = 310.0f * s;   // posicion del panel de objetivos (la ayuda va a su derecha)
             float ayuda = tiempoEnZona < 18.0f ? 1.0f : (tiempoEnZona < 20.0f ? (20.0f - tiempoEnZona) / 2.0f : 0.0f);
             if (ayuda > 0.0f) {
-                float x0 = bx + bw + 18 * s, x1 = W - 18 * s, aw = x1 - x0;
+                float x1 = W - 18 * s - ui.MedirTexto("H: ocultar ayuda", 12 * s, false) - 18 * s;   // deja libre la pista de abajo a la derecha
+                float x0 = bx + bw + 18 * s, aw = x1 - x0;
                 const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  F linterna  ·  V cámara  ·  Esc menú";
                 const char* l2 = "Clic: recoger basura y retirar peces león  ·  Clic sostenido: cortar la red  ·  El dron señala la basura más cercana";
                 std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);

@@ -498,18 +498,19 @@ bool Update() {
 		: estadoActual == AGUAS_FRIAS ? aguasFrias.Detalle(*sel, colorDetalle)
 		: estadoActual == NAUFRAGIOS ? naufragio.Detalle(*sel, colorDetalle) : std::string();
 	if (!inspeccion) menuInicio.DrawMira(window, sel ? sel->etiqueta : std::string(), sel && sel->basura, detalle, colorDetalle);
-	if (!HUD().intro && !recorridoTerminado) {
+	if (!HUD().intro && !recorridoTerminado && !inspeccion) {   // al inspeccionar solo se ve el modelo y su ficha
 		if (estadoActual == ARRECIFES) arrecife.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 		if (estadoActual == AGUAS_FRIAS) aguasFrias.DibujarHUD(menuInicio, window, animTime, zonaTiempo);
 		if (estadoActual == NAUFRAGIOS) naufragio.DibujarHUD(menuInicio, window, animTime, zonaTiempo, projection, view);
 	}
-	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
+	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, false);   // sin la imagen de teclas: cada zona tiene su ayuda (H)
 	menuInicio.Comenzar(window);
 	// Nivel de uso: teclas en el borde (basico/intermedio siempre, avanzado solo si el buzo se queda quieto)
-	if (!HUD().intro && !recorridoTerminado && tSiguiente < 0.0f && !inspeccion && !tiempoAgotado)
+	// (se oculta con el album abierto o con la ficha completa en pantalla para no encimarse)
+	if (!HUD().intro && !recorridoTerminado && tSiguiente < 0.0f && !inspeccion && !tiempoAgotado && !Album().abierto && !(sel && HUD().fichaAbierta))
 		HUDTeclasBorde(menuInicio, TeclasZona());
 	// Dificultad: reloj de la zona (arriba al centro)
-	if (!HUD().intro && !recorridoTerminado && !tiempoAgotado && !MisionCumplida() && !inspeccion)
+	if (!HUD().intro && !recorridoTerminado && !tiempoAgotado && !MisionCumplida() && !inspeccion && !Album().abierto)
 		HUDCronometro(menuInicio, TiempoLimite() - tiempoUsado, animTime);
 	HUD().objetivoDerecha = 0.0f;   // lo vuelve a escribir HUDObjetivo en el siguiente cuadro
 	if (tiempoAgotado) {

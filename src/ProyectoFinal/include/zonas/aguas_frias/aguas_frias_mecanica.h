@@ -358,10 +358,13 @@ public:
         }
         // ---------------- avisos (arriba al centro)
         float ay = 92.0f * s;
+        // con H los avisos se angostan para no encimarse con la cadena trofica (izquierda, 18 + 270) ni el termometro
+        float anchoAviso = HUD().detallado ? W - 2.0f * (18.0f + 270.0f + 18.0f) * s - 36.0f * s : 600.0f * s;
+        if (anchoAviso > 600.0f * s) anchoAviso = 600.0f * s;
         for (int i = (int)avisos.size() - 1, n = 0; i >= 0 && n < (HUD().detallado ? 2 : 1); i--, n++) {
             const AvisoHUD& a = avisos[i];
             float alfa = a.vida < 0.6f ? a.vida / 0.6f : (a.total - a.vida < 0.3f ? (a.total - a.vida) / 0.3f : 1.0f);
-            std::vector<std::string> ls = ui.Lineas(a.texto, 600.0f * s, 16.0f * s, true);
+            std::vector<std::string> ls = ui.Lineas(a.texto, anchoAviso, 16.0f * s, true);
             float aw = 0.0f;
             for (auto& l : ls) { float m = ui.MedirTexto(l, 16.0f * s, true); aw = m > aw ? m : aw; }
             aw += 36 * s; float ah = ls.size() * 16.0f * s * 1.3f + 22 * s;
@@ -408,12 +411,18 @@ public:
         if (estadoFinal == 1) {
             ui.Rect(glm::vec4(0, 0, W, H), glm::vec4(0.35f, 0.02f, 0.02f, 0.18f + 0.06f * sinf(t * 3.0f)));
             ui.Texto("PERDIMOS EL HÁBITAT", W * 0.5f, H * 0.40f, 46 * s, glm::vec4(1.0f, 0.5f, 0.45f, 1.0f), 1);
-            ui.Texto("Sin hielo, los gigantes del mar se vuelven fantasmas. Enfría el agua (G) para recuperarlo.", W * 0.5f, H * 0.40f + 60 * s, 18 * s, glm::vec4(1.0f, 0.88f, 0.85f, 1.0f), 1, false);
+            float yl = H * 0.40f + 60 * s;   // en varias lineas para no encimarse con el termometro (H)
+            for (const std::string& l : ui.Lineas("Sin hielo, los gigantes del mar se vuelven fantasmas. Enfría el agua (G) para recuperarlo.", 600 * s, 18 * s, false)) {
+                ui.Texto(l, W * 0.5f, yl, 18 * s, glm::vec4(1.0f, 0.88f, 0.85f, 1.0f), 1, false); yl += 24 * s;
+            }
         }
         else if (estadoFinal == 2) {
             ui.Resplandor(glm::vec4(W * 0.5f - 330 * s, H * 0.40f - 10 * s, 660 * s, 70 * s), glm::vec4(0.5f, 1.0f, 0.8f, 0.25f + 0.1f * sinf(t * 2.0f)), 20 * s, 20 * s);
             ui.Texto("AGUAS FRÍAS RESTAURADAS", W * 0.5f, H * 0.40f, 42 * s, glm::vec4(0.6f, 1.0f, 0.85f, 1.0f), 1);
-            ui.Texto("El hielo volvió a brillar. Así de rápido puede cambiar un ecosistema... en los dos sentidos.", W * 0.5f, H * 0.40f + 56 * s, 17 * s, glm::vec4(0.9f, 1.0f, 0.95f, 1.0f), 1, false);
+            float yl = H * 0.40f + 56 * s;   // en varias lineas para no encimarse con el termometro (H)
+            for (const std::string& l : ui.Lineas("El hielo volvió a brillar. Así de rápido puede cambiar un ecosistema... en los dos sentidos.", 600 * s, 17 * s, false)) {
+                ui.Texto(l, W * 0.5f, yl, 17 * s, glm::vec4(0.9f, 1.0f, 0.95f, 1.0f), 1, false); yl += 23 * s;
+            }
         }
         Album().Dibujar(ui, EspeciesFoto(), "Aguas frías");   // tecla L
         ui.Terminar();

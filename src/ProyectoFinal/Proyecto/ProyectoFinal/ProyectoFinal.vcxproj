@@ -163,6 +163,7 @@
     <ClInclude Include="..\..\include\interaccion\modo_edicion.h" />
     <ClInclude Include="..\..\include\interaccion\picking.h" />
     <ClInclude Include="..\..\include\interfaz\fichas.h" />
+    <ClInclude Include="..\..\include\interfaz\album.h" />
     <ClInclude Include="..\..\include\interfaz\estado_hud.h" />
     <ClInclude Include="..\..\include\interfaz\hud_comun.h" />
     <ClInclude Include="..\..\include\interfaz\menu.h" />

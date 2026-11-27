@@ -9,7 +9,7 @@
 *
 *  - Termometro (HUD): T calienta y G enfria el agua; el hielo se encoge al calentar.
 *  - Con poco hielo, foca, pinguino, ballena y oso polar se vuelven fantasmas.
-*  - X toma una foto al animal bajo la mira (14 especies).
+*  - X toma una foto al animal bajo la mira (14 especies); L abre el album (interfaz/album.h).
 *  - Clic en krill o pescado para recogerlos y en un animal para alimentarlo.
 *  - Si el hielo llega a 0 se pierde el habitat; con los 5 objetivos y el hielo sano, la zona se restaura.
 */
@@ -21,6 +21,7 @@
 #include <escena/escenario.h>
 #include <interfaz/menu.h>
 #include <interfaz/fichas.h>
+#include <interfaz/album.h>
 
 class MecanicaAguasFrias
 {
@@ -38,6 +39,7 @@ public:
     {
         temperatura = T_INICIAL; hielo = 1.0f; estadoFinal = 0; hitos = 0; objCalor = false; objFantasma = false;
         avisos.clear(); fotos.clear(); alimentados.clear(); barcoParado = 0.0f; barcoXPrev = -999.0f;
+        Album().Limpiar();
         krillMochila = 0; pescadoMochila = 0; flash = 0.0f; marco = 0.0f;
         for (int i = 0; i < 4; i++) { pob[i] = 1.0f; apoyo[i] = 0.0f; }
 
@@ -62,6 +64,7 @@ public:
             Aviso("Zona reiniciada. En la realidad, el hielo perdido tarda décadas en volver.", glm::vec3(0.5f, 1.0f, 0.6f), 6.0f);
         }
         else if (key == GLFW_KEY_X) TomarFoto(esc);
+        else if (key == GLFW_KEY_L) Album().abierto = !Album().abierto;   // album de fotos
     }
 
     // ------------------------------------------------------------------ clic izquierdo: recoger y alimentar
@@ -246,7 +249,7 @@ public:
         IntroZona in; in.titulo = "ZONA 2 · AGUAS FRÍAS"; in.subtitulo = "Deshielo y cadenas tróficas";
         in.historia = "El hielo marino sostiene toda la cadena alimenticia polar: del krill a las ballenas. Sin él, focas, pingüinos y osos pierden su hogar.";
         in.objetivos = { "Calienta el agua (T) y derrite la mitad del hielo", "Fotografía a un animal fantasma (X)",
-                         "Fotografía las especies (X)", "Alimenta a 4 animales (clic en krill o pescado)", "Enfría el agua (G) y restaura el hielo" };
+                         "Fotografía todas las especies (X · L: álbum)", "Alimenta a 4 animales (clic en krill o pescado)", "Enfría el agua (G) y restaura el hielo" };
         in.controles = { "WASD nadar · Espacio / Ctrl subir y bajar · Shift aletear · Ratón mirar",
                          "Clic recoger o alimentar · I ficha del animal · H ayuda · Esc menú" };
         in.color = glm::vec3(0.6f, 0.9f, 1.0f);
@@ -346,7 +349,7 @@ public:
             char tx[96];
             if (!o1) snprintf(tx, sizeof(tx), "Calienta el agua (T) y derrite la mitad del hielo");
             else if (!o2) snprintf(tx, sizeof(tx), "Fotografía a un animal fantasma (X)");
-            else if (!o3) snprintf(tx, sizeof(tx), "Fotografía las especies (X): %d/%d", (int)fotos.size(), TOTAL_FOTOS);
+            else if (!o3) snprintf(tx, sizeof(tx), "Fotografía las especies (X · L: álbum): %d/%d", (int)fotos.size(), TOTAL_FOTOS);
             else if (!o4) snprintf(tx, sizeof(tx), "Alimenta animales (clic en krill o pescado): %d/%d", (int)alimentados.size(), TOTAL_ALIMENTADOS);
             else if (!o5) snprintf(tx, sizeof(tx), "Enfría el agua (G) y restaura el hielo al 95%%");
             else snprintf(tx, sizeof(tx), "¡Objetivos completos!");
@@ -412,6 +415,7 @@ public:
             ui.Texto("AGUAS FRÍAS RESTAURADAS", W * 0.5f, H * 0.40f, 42 * s, glm::vec4(0.6f, 1.0f, 0.85f, 1.0f), 1);
             ui.Texto("El hielo volvió a brillar. Así de rápido puede cambiar un ecosistema... en los dos sentidos.", W * 0.5f, H * 0.40f + 56 * s, 17 * s, glm::vec4(0.9f, 1.0f, 0.95f, 1.0f), 1, false);
         }
+        Album().Dibujar(ui, EspeciesFoto(), "Aguas frías");   // tecla L
         ui.Terminar();
     }
 
@@ -445,19 +449,26 @@ private:
         return a == "ballena" || a == "foca" || a == "pinguino" || a == "osito" || a == "morsa" || a == "Orca2" || a == "Narwhal2" || a == "Cachalote2" || a == "LeonMarino2";
     }
 
+    // Especies del album de la zona (en este orden se muestran con L)
+    static const std::vector<std::string>& EspeciesFoto()
+    {
+        static const std::vector<std::string> v = { "Ballena azul", "Beluga", "Foca", "Pinguino", "Oso polar", "Morsa", "Krill", "Bacalao", "Orca", "Narval", "Cachalote", "Calamar colosal", "Leon marino", "Pez dracoide" };
+        return v;
+    }
+
     void TomarFoto(Escenario& esc)
     {
         flash = 1.0f; marco = 1.2f;
         const Elemento* s = esc.Seleccionado();
-        const char* especies[14] = { "Ballena azul", "Beluga", "Foca", "Pinguino", "Oso polar", "Morsa", "Krill", "Bacalao", "Orca", "Narval", "Cachalote", "Calamar colosal", "Leon marino", "Pez dracoide" };
         bool esEspecie = false;
-        if (s) for (int i = 0; i < 14; i++) if (s->etiqueta == especies[i]) esEspecie = true;
+        if (s) for (const std::string& e : EspeciesFoto()) if (s->etiqueta == e) esEspecie = true;
         if (!esEspecie) { Aviso("Apunta con la mira a un animal y presiona X para fotografiarlo.", glm::vec3(0.8f, 0.9f, 1.0f), 4.0f); return; }
         const Ficha* f = BuscarFicha(s->etiqueta);
         std::string nombre = f ? f->nombre : s->etiqueta;
         if (s->fantasma > 0.5f && !objFantasma) objFantasma = true;
         if (fotos.count(s->etiqueta)) { Aviso("Ya tienes una foto de esta especie: " + nombre + ".", glm::vec3(0.8f, 0.9f, 1.0f), 3.5f); return; }
         fotos.insert(s->etiqueta); sonarDescubrir = true;
+        Album().pendiente = s->etiqueta;   // ProyectoFinal copia la pantalla a la foto del album
         if (s->fantasma > 0.5f)
             Aviso("Último registro de la especie: " + nombre + ". Así se vería si desaparece su hábitat.", glm::vec3(0.7f, 0.85f, 1.0f), 6.0f);
         else

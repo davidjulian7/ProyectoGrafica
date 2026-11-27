@@ -48,6 +48,7 @@
 #include <texturas/cubemap.h>
 #include <animacion/particles.h>
 #include <interfaz/menu.h>          // menú de inicio y HUD de zonas
+#include <interfaz/album.h>         // álbum de fotos (X foto, L álbum) de las zonas 1 y 2
 #include <escena/escenario.h>         // contenido y render de las tres zonas
 #include <zonas/arrecifes/arrecifes_mecanica.h>      // Zona 1: termómetro y blanqueamiento de coral
 #include <zonas/naufragios/naufragios_mecanica.h>    // Zona 3: limpieza, pez león, red fantasma y cofre
@@ -99,6 +100,12 @@ bool recorridoTerminado = false;     // se completaron las tres zonas: pantalla 
 void AvanzarRecorrido();
 void CerrarIntro();
 std::vector<std::string> TeclasZona();   // teclas que se muestran en el borde segun el nivel de uso
+
+// --- Dificultad por tiempo: cada zona se completa antes de TiempoLimite() (interfaz/estado_hud.h → TIEMPO_NIVEL)
+float tiempoUsado = 0.0f;            // segundos jugados en la zona (no cuentan la tarjeta inicial ni la inspeccion)
+bool tiempoAgotado = false;          // se acabo el tiempo: Enter repite la zona, Esc vuelve al menu
+float tAgotado = 0.0f;               // segundos desde que se acabo (para el fundido del aviso)
+bool MisionCumplida();
 
 Escenario escenario;        // zonas de inmersión (include/zonas.h)
 MecanicaArrecife arrecife;  // mecánica de la Zona 1 (include/arrecife.h)
@@ -363,30 +370,41 @@ bool Update() {
 
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
 	if (HUD().intro) HUD().introTiempo += deltaTime;
-	if (!inspeccion && !HUD().intro) processInput(window);
+	if (!inspeccion && !HUD().intro && !tiempoAgotado) processInput(window);
 	// Nivel de uso avanzado: cuenta cuanto tiempo lleva el buzo sin nadar (el raton y las teclas lo reinician)
 	if (HUD().intro || glm::length(diverVelocity) > 0.3f) HUD().quieto = 0.0f;
 	else HUD().quieto += deltaTime;
 	if (escenario.Actualizar(dtEscena, animTime, camera))
 		Efecto("sound/burbujas.wav", 0.35f);          // exhalación del buzo
-	if (estadoActual == ARRECIFES && !HUD().intro) {
+	if (estadoActual == ARRECIFES && !HUD().intro && !tiempoAgotado) {
 		arrecife.Actualizar(dtEscena, window, escenario, escenario.Seleccionado());
 		if (arrecife.sonarAlerta) { Efecto("sound/alerta.wav", 0.6f); arrecife.sonarAlerta = false; }
 		if (arrecife.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); arrecife.sonarDescubrir = false; }
 	}
-	if (estadoActual == AGUAS_FRIAS && !HUD().intro) {
+	if (estadoActual == AGUAS_FRIAS && !HUD().intro && !tiempoAgotado) {
 		aguasFrias.Actualizar(deltaTime, window, escenario, escenario.Seleccionado());
 		if (aguasFrias.sonarAlerta) { Efecto("sound/alerta.wav", 0.5f); aguasFrias.sonarAlerta = false; }
 		if (aguasFrias.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); aguasFrias.sonarDescubrir = false; }
 		if (aguasFrias.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); aguasFrias.sonarRecoger = false; }
 	}
-	if (estadoActual == NAUFRAGIOS && !HUD().intro) {
+	if (estadoActual == NAUFRAGIOS && !HUD().intro && !tiempoAgotado) {
 		naufragio.Actualizar(deltaTime, animTime, window, escenario, camera, escenario.Seleccionado());
 		if (naufragio.sonarRecoger) { Efecto("sound/recoger.wav", 0.55f); naufragio.sonarRecoger = false; }
 		if (naufragio.sonarAlerta) { Efecto("sound/alerta.wav", 0.5f); naufragio.sonarAlerta = false; }
 		if (naufragio.sonarDescubrir) { Efecto("sound/descubrir.wav", 0.5f); naufragio.sonarDescubrir = false; }
 		if (naufragio.sonarMonedas) { Efecto("sound/monedas.wav", 0.8f); naufragio.sonarMonedas = false; }
 	}
+
+	// Dificultad: el reloj corre mientras se juega y se detiene al cumplir la mision de la zona
+	if (!HUD().intro && !tiempoAgotado && !recorridoTerminado && !MisionCumplida()) {
+		tiempoUsado += dtEscena;
+		if (tiempoUsado >= TiempoLimite()) {
+			tiempoAgotado = true; tAgotado = 0.0f; Album().abierto = false;
+			Efecto("sound/alerta.wav", 0.6f);
+			std::cout << ">> Se acabo el tiempo (Enter: intentar de nuevo, Esc: menu)" << std::endl;
+		}
+	}
+	if (tiempoAgotado) tAgotado += deltaTime;
 
 	// Recorrido: cuando la zona se completa empieza la cuenta para pasar a la siguiente
 	bool zonaHecha = (estadoActual == ARRECIFES && arrecife.completado)
@@ -456,6 +474,7 @@ bool Update() {
 	//    camVista gobierna la vista; la linterna sigue atada al buzo (camera FP)
 	escenario.Dibujar(projection, view, *camVista, animTime, fbW, fbH, &camera, (modoOrbita || modoOrtogonal) && !inspeccion);
 	if (inspeccion) escenario.DibujarInspeccion(projection, view, camera, animTime);
+	Album().Capturar(fbW, fbH);   // X: la foto se toma de la escena sin HUD (interfaz/album.h)
 
 	// 3) HUD: nombre de la zona, ayuda, mira y fundido de entrada
 	const Elemento* sel = escenario.Seleccionado();
@@ -473,9 +492,18 @@ bool Update() {
 	menuInicio.DrawHUD(window, (int)estadoActual, zonaFade, zonaTiempo, estadoActual == AGUAS_FRIAS);
 	menuInicio.Comenzar(window);
 	// Nivel de uso: teclas en el borde (basico/intermedio siempre, avanzado solo si el buzo se queda quieto)
-	if (!HUD().intro && !recorridoTerminado && tSiguiente < 0.0f && !inspeccion)
+	if (!HUD().intro && !recorridoTerminado && tSiguiente < 0.0f && !inspeccion && !tiempoAgotado)
 		HUDTeclasBorde(menuInicio, TeclasZona());
-	if (HUD().intro) {                                   // indicaciones al entrar a la zona
+	// Dificultad: reloj de la zona (a la izquierda del termometro o de la barra de limpieza)
+	if (!HUD().intro && !recorridoTerminado && !tiempoAgotado && !MisionCumplida() && !inspeccion) {
+		float ocupado = HUD().detallado ? 0.0f : (estadoActual == NAUFRAGIOS ? 200.0f : 74.0f) * menuInicio.Escala();
+		HUDCronometro(menuInicio, TiempoLimite() - tiempoUsado, animTime, ocupado);
+	}
+	if (tiempoAgotado) {
+		const char* zonas[] = { "", "Zona 1 · Arrecifes", "Zona 2 · Aguas Frías", "Zona 3 · Naufragios" };
+		HUDTiempoAgotado(menuInicio, zonas[estadoActual], tAgotado);
+	}
+	else if (HUD().intro) {                                   // indicaciones al entrar a la zona
 		IntroZona in = estadoActual == ARRECIFES ? arrecife.Intro() : (estadoActual == AGUAS_FRIAS ? aguasFrias.Intro() : naufragio.Intro());
 		HUDIntro(menuInicio, in, HUD().introTiempo);
 	}
@@ -651,7 +679,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) CerrarIntro();
 		return;
 	}
-	if (recorridoTerminado) return;
+	if (recorridoTerminado || tiempoAgotado) return;
 	if (estadoActual == ARRECIFES && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !escenario.modoEdicion) {
 		if (escenario.InspeccionActiva()) escenario.CerrarInspeccion();
 		else escenario.AbrirInspeccion();
@@ -778,6 +806,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ESCAPE) VolverAlMenu();
 		return;
 	}
+	// Se acabo el tiempo: Enter repite la zona, Esc vuelve al menu
+	if (tiempoAgotado) {
+		if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) EntrarZona((int)estadoActual);
+		else if (key == GLFW_KEY_ESCAPE) VolverAlMenu();
+		return;
+	}
 	// Zona completada: Enter pasa a la siguiente sin esperar
 	if ((key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) && tSiguiente >= 0.0f) { AvanzarRecorrido(); return; }
 	HUD().quieto = 0.0f;   // cualquier tecla cuenta como actividad (nivel avanzado)
@@ -889,6 +923,7 @@ void EntrarZona(int zona)
 	// Nivel de uso: solo el BASICO recibe la tarjeta de indicaciones al entrar a cada zona
 	HUD().intro = (HUD().nivel == NIVEL_BASICO); HUD().introTiempo = 0.0f; HUD().fichaAbierta = false; HUD().quieto = 0.0f;
 	tSiguiente = -1.0f; recorridoTerminado = false;
+	tiempoUsado = 0.0f; tiempoAgotado = false; tAgotado = 0.0f;   // el reloj de la zona empieza de cero
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	std::string titulo = std::string("Acuario Virtual Interactivo - ") + nombresZona[zona];
@@ -910,10 +945,20 @@ std::vector<std::string> TeclasZona()
 {
 	IntroZona in = estadoActual == ARRECIFES ? arrecife.Intro() : (estadoActual == AGUAS_FRIAS ? aguasFrias.Intro() : naufragio.Intro());
 	std::vector<std::string> teclas = in.controles;
-	if (estadoActual == ARRECIFES)   teclas.push_back("↑ / ↓ temperatura · T calentamiento automático · R restaurar · L especies");
-	if (estadoActual == AGUAS_FRIAS) teclas.push_back("T calentar · G enfriar · X foto · R reiniciar");
+	if (estadoActual == ARRECIFES)   teclas.push_back("↑ / ↓ temperatura · T calentamiento automático · R restaurar · X foto · L álbum");
+	if (estadoActual == AGUAS_FRIAS) teclas.push_back("T calentar · G enfriar · X foto · L álbum · R reiniciar");
 	if (estadoActual == NAUFRAGIOS)  teclas.push_back("Clic recoger basura · L especies");
 	return teclas;
+}
+
+// Dificultad: la mision de la zona ya se cumplio (el reloj se detiene)
+//   Zona 3: basta con limpiar el fondo y retirar a los peces leon; el cofre es la recompensa
+bool MisionCumplida()
+{
+	if (estadoActual == ARRECIFES)   return arrecife.completado;
+	if (estadoActual == AGUAS_FRIAS) return aguasFrias.Completado();
+	if (estadoActual == NAUFRAGIOS)  return naufragio.completado;
+	return false;
 }
 
 // Recorrido: pasa a la siguiente zona o, despues de la ultima, a la pantalla final
@@ -925,7 +970,8 @@ void AvanzarRecorrido()
 
 void VolverAlMenu()
 {
-	HUD().intro = false; tSiguiente = -1.0f; recorridoTerminado = false;
+	HUD().intro = false; tSiguiente = -1.0f; recorridoTerminado = false; tiempoAgotado = false;
+	Album().abierto = false;
 	estadoActual = MENU;
 	menuInicio.Reiniciar();
 	Ambiente("sound/ambiente_arrecife.wav", silencio ? 0.0f : 0.25f);   // ambiente suave en el menú

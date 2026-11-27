@@ -45,6 +45,7 @@
     <ClInclude Include="..\..\include\interaccion\modo_edicion.h"><Filter>6 Interaccion: picking y edicion (13)</Filter></ClInclude>
     <ClInclude Include="..\..\include\interaccion\picking.h"><Filter>6 Interaccion: picking y edicion (13)</Filter></ClInclude>
     <ClInclude Include="..\..\include\interfaz\fichas.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
+    <ClInclude Include="..\..\include\interfaz\album.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
     <ClInclude Include="..\..\include\interfaz\estado_hud.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
     <ClInclude Include="..\..\include\interfaz\hud_comun.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>
     <ClInclude Include="..\..\include\interfaz\menu.h"><Filter>7 Interfaz: menu, HUD, fichas</Filter></ClInclude>

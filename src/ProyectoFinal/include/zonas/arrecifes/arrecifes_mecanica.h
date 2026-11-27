@@ -14,7 +14,7 @@
 *    demasiado, muere y lo cubren las algas. Si el agua se enfria a tiempo, los
 *    corales vivos recuperan su color.
 *  - El ecosistema responde: los cardumenes se reducen y el agua se enturbia.
-*  - Bitacora: al observar una especie con la mira se registra.
+*  - Album: X fotografia la especie que senala la mira; L abre el album (interfaz/album.h).
 */
 #include <string>
 #include <vector>
@@ -25,6 +25,7 @@
 #include <interfaz/menu.h>
 #include <interfaz/fichas.h>
 #include <interfaz/hud_comun.h>
+#include <interfaz/album.h>
 
 class MecanicaArrecife
 {
@@ -37,13 +38,14 @@ public:
     int corales = 0, blanqueados = 0, muertos = 0;
     // eventos de sonido (ProyectoFinal los reproduce y los apaga)
     bool sonarAlerta = false, sonarDescubrir = false;
-    bool verLista = false;                 // tecla L: lista de especies de la bitacora
+    bool verLista = false;                 // (ya no se usa: L abre el album de fotos, interfaz/album.h)
     bool completado = false;
 
     void Reiniciar(Escenario& esc)
     {
         temperatura = T_INICIAL; automatico = false; hitos = 0; avisos.clear();
-        registradas.clear(); ultimaMira.clear(); tiempoMira = 0.0f;
+        registradas.clear(); ultimaMira.clear(); tiempoMira = 0.0f; flash = 0.0f;
+        Album().Limpiar();
         std::set<std::string> especies;
         for (auto& e : esc.Elementos()) {
             e.estres = e.blanqueo = e.muerte = 0.0f; e.presencia = 1.0f;
@@ -64,7 +66,8 @@ public:
             for (auto& e : esc.Elementos()) { e.estres = e.blanqueo = e.muerte = 0.0f; e.presencia = 1.0f; }
             Aviso("Arrecife restaurado. En la realidad, un arrecife tarda de 10 a 15 años en recuperarse de un blanqueamiento masivo.", glm::vec3(0.5f, 1.0f, 0.6f), 7.0f);
         }
-        else if (key == GLFW_KEY_L) verLista = !verLista;
+        else if (key == GLFW_KEY_L) Album().abierto = !Album().abierto;   // album de fotos
+        else if (key == GLFW_KEY_X) TomarFoto(esc);
         else if (key == GLFW_KEY_T) {
             automatico = !automatico;
             if (automatico) Aviso("Simulación de calentamiento: la temperatura sube poco a poco, como en una ola de calor marina.", glm::vec3(1.0f, 0.75f, 0.4f), 6.0f);
@@ -148,18 +151,8 @@ public:
                   glm::vec3(0.5f, 1.0f, 0.6f), 7.0f);
         }
 
-        // --- bitacora de especies
-        if (sel) {
-            if (sel->etiqueta == ultimaMira) tiempoMira += dt; else { ultimaMira = sel->etiqueta; tiempoMira = 0.0f; }
-            const Ficha* f = BuscarFicha(sel->etiqueta);
-            if (f && f->bitacora && tiempoMira > 0.25f && !registradas.count(sel->etiqueta)) {
-                registradas.insert(sel->etiqueta); sonarDescubrir = true;
-                Aviso("Nueva especie en tu bitácora: " + f->nombre, glm::vec3(0.55f, 0.95f, 1.0f), 3.5f);
-                if ((int)registradas.size() == totalEspecies)
-                    Aviso("¡Bitácora completa! Registraste todas las especies del arrecife.", glm::vec3(0.5f, 1.0f, 0.6f), 7.0f);
-            }
-        }
-        else ultimaMira.clear();
+        // --- album: las especies se registran al fotografiarlas (X, ver TomarFoto)
+        flash -= dt * 2.5f; if (flash < 0.0f) flash = 0.0f;
 
         for (size_t i = 0; i < avisos.size(); ) {
             avisos[i].vida -= dt;
@@ -170,11 +163,14 @@ public:
     // Texto de estado para la ficha de un coral
     std::string Detalle(const Elemento& e, glm::vec3& color) const
     {
-        if (!e.esCoral) return "";
+        const Ficha* f = BuscarFicha(e.etiqueta);
+        std::string foto = (f && f->bitacora && !registradas.count(e.etiqueta)) ? "X: foto" : "";
+        if (!e.esCoral) { if (!foto.empty()) color = glm::vec3(1.0f, 0.85f, 0.6f); return foto; }
+        std::string extra = foto.empty() ? "" : "  ·  " + foto;
         char b[64];
-        if (e.muerte > 0.5f) { color = glm::vec3(1.0f, 0.5f, 0.45f); return "Estado: muerto, cubierto de algas"; }
-        if (e.blanqueo > 0.15f) { color = glm::vec3(1.0f, 0.8f, 0.5f); snprintf(b, sizeof(b), "Estado: blanqueado %d%%", (int)(e.blanqueo * 100.0f + 0.5f)); return b; }
-        color = glm::vec3(0.5f, 1.0f, 0.6f); return "Estado: sano";
+        if (e.muerte > 0.5f) { color = glm::vec3(1.0f, 0.5f, 0.45f); return "Estado: muerto, cubierto de algas" + extra; }
+        if (e.blanqueo > 0.15f) { color = glm::vec3(1.0f, 0.8f, 0.5f); snprintf(b, sizeof(b), "Estado: blanqueado %d%%", (int)(e.blanqueo * 100.0f + 0.5f)); return b + extra; }
+        color = glm::vec3(0.5f, 1.0f, 0.6f); return "Estado: sano" + extra;
     }
 
     // Indicaciones al entrar a la zona (tarjeta inicial)
@@ -183,7 +179,7 @@ public:
         IntroZona in; in.titulo = "ZONA 1 · ARRECIFES"; in.subtitulo = "Estrés térmico y blanqueamiento del coral";
         in.historia = "Los corales viven en equilibrio con algas que les dan color y alimento. Si el agua se calienta demasiado, las expulsan y se blanquean; si el calor sigue, mueren.";
         in.objetivos = { "Sube la temperatura (↑) hasta blanquear el arrecife", "Enfría el agua (↓) o restaura con R para salvarlo",
-                         "Registra las especies apuntándoles con la mira (L: lista)" };
+                         "Fotografía todas las especies (X · L: álbum)" };
         in.controles = { "WASD nadar · Espacio / Ctrl subir y bajar · Shift aletear · Ratón mirar",
                          "Clic inspeccionar · I ficha del animal · H ayuda · Esc menú" };
         in.color = glm::vec3(0.45f, 0.85f, 1.0f);
@@ -249,11 +245,11 @@ public:
             ui.Texto(b, bx + 16 * s, by + 60 * s, 14 * s, glm::vec4(0.95f, 0.95f, 0.95f, 1.0f), 0, false);
             snprintf(b, sizeof(b), "Corales muertos: %d", muertos);
             ui.Texto(b, bx + 16 * s, by + 82 * s, 14 * s, glm::vec4(muertos ? glm::vec3(1.0f, 0.6f, 0.55f) : glm::vec3(0.95f), 1.0f), 0, false);
-            snprintf(b, sizeof(b), "Especies registradas: %d de %d  (L: lista)", (int)registradas.size(), totalEspecies);
+            snprintf(b, sizeof(b), "Especies fotografiadas: %d de %d  (L: álbum)", (int)registradas.size(), totalEspecies);
             ui.Texto(b, bx + 16 * s, by + 104 * s, 14 * s, glm::vec4(0.6f, 0.95f, 1.0f, 1.0f), 0, false);
             ui.Texto("OBJETIVOS", bx + 16 * s, by + 132 * s, 13 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f));
             bool hecho[3] = { calento, recupero, (int)registradas.size() >= totalEspecies };
-            const char* obj[3] = { "Sube la temperatura hasta blanquear el arrecife", "Enfría el agua (↓) o restaura (R)", "Registra todas las especies" };
+            const char* obj[3] = { "Sube la temperatura hasta blanquear el arrecife", "Enfría el agua (↓) o restaura (R)", "Fotografía todas las especies (X)" };
             for (int k = 0; k < 3; k++) {
                 glm::vec4 c = hecho[k] ? glm::vec4(0.5f, 1.0f, 0.6f, 1.0f) : glm::vec4(0.92f, 0.95f, 1.0f, 1.0f);
                 ui.Texto(hecho[k] ? "✓" : "·", bx + 22 * s, by + 152 * s + k * 22 * s, 16 * s, c, 1);
@@ -265,8 +261,8 @@ public:
             bool h0 = calento, h1 = recupero, h2 = (int)registradas.size() >= totalEspecies;
             const char* txt = !h0 ? "Sube la temperatura (↑) hasta blanquear el arrecife"
                             : !h1 ? "Enfría el agua (↓) o restaura con R"
-                            : !h2 ? "Registra las especies con la mira (L: lista)" : "¡Objetivos completos!";
-            char ex[64]; snprintf(ex, sizeof(ex), "Especies %d/%d · corales muertos %d", (int)registradas.size(), totalEspecies, muertos);
+                            : !h2 ? "Fotografía las especies (X · L: álbum)" : "¡Objetivos completos!";
+            char ex[64]; snprintf(ex, sizeof(ex), "Fotos %d/%d · corales muertos %d", (int)registradas.size(), totalEspecies, muertos);
             HUDObjetivo(ui, txt, (int)h0 + (int)h1 + (int)h2, 3, ex);
         }
         // ---------------- avisos (arriba al centro)
@@ -293,7 +289,7 @@ public:
             if (ayuda > 0.0f) {
                 float x0 = bx + bw + 18 * s, x1 = W - 18 * s, aw = x1 - x0;
                 const char* l1 = "WASD nadar  ·  Espacio / Ctrl subir y bajar  ·  Shift aletear  ·  Clic inspeccionar objeto  ·  Esc menú";
-                const char* l2 = "↑ / ↓ temperatura  ·  T calentamiento automático  ·  R restaurar  ·  Apunta a las especies para registrarlas";
+                const char* l2 = "↑ / ↓ temperatura  ·  T calentamiento automático  ·  R restaurar  ·  X fotografiar especies  ·  L álbum";
                 std::vector<std::string> a1 = ui.Lineas(l1, aw - 28 * s, 14 * s, false), a2 = ui.Lineas(l2, aw - 28 * s, 14 * s, true);
                 float lh = 14 * s * 1.35f, ah = (a1.size() + a2.size()) * lh + 20 * s, ay2 = H - 18 * s - ah;
                 ui.Rect(glm::vec4(x0, ay2, aw, ah), glm::vec4(0.01f, 0.07f, 0.12f, 0.72f * ayuda), 12 * s);
@@ -303,12 +299,13 @@ public:
             }
         }
         HUDPistaTeclas(ui);
-        if (verLista) HUDListaEspecies(ui, especiesLista, registradas);
+        if (flash > 0.0f) ui.Rect(glm::vec4(0, 0, W, H), glm::vec4(1.0f, 1.0f, 1.0f, 0.75f * flash));   // destello de la foto
+        Album().Dibujar(ui, especiesLista, "Arrecifes");
         if (completado) {
             char r1[64], r2[64], r3[64];
             snprintf(r1, sizeof(r1), "Blanqueaste el arrecife (máximo: %.1f °C)", tMax);
             snprintf(r2, sizeof(r2), "Enfriaste el agua: %d corales murieron en el proceso", muertos);
-            snprintf(r3, sizeof(r3), "Registraste las %d especies del arrecife", totalEspecies);
+            snprintf(r3, sizeof(r3), "Fotografiaste las %d especies del arrecife", totalEspecies);
             HUDZonaCompletada(ui, tCompleto, "Zona 1 · Arrecifes", { r1, r2, r3 },
                 "Con 1.5 °C de calentamiento global se perdería entre el 70% y el 90% de los arrecifes de coral del planeta (IPCC, 2018).");
         }
@@ -326,6 +323,21 @@ private:
     bool calento = false, recupero = false;
     std::string ultimaMira;
     float tiempoMira = 0.0f;
+    float flash = 0.0f;   // destello blanco al tomar una foto
+
+    // X: foto de la especie bajo la mira. La captura de la pantalla la hace ProyectoFinal (Album().Capturar)
+    void TomarFoto(Escenario& esc)
+    {
+        flash = 1.0f;
+        const Elemento* s = esc.Seleccionado();
+        const Ficha* f = s ? BuscarFicha(s->etiqueta) : nullptr;
+        if (!f || !f->bitacora) { Aviso("Apunta con la mira a una especie y presiona X para fotografiarla.", glm::vec3(0.8f, 0.9f, 1.0f), 4.0f); return; }
+        if (registradas.count(s->etiqueta)) { Aviso("Ya tienes una foto de esta especie: " + f->nombre + ".", glm::vec3(0.8f, 0.9f, 1.0f), 3.5f); return; }
+        registradas.insert(s->etiqueta); Album().pendiente = s->etiqueta; sonarDescubrir = true;
+        Aviso("Foto guardada: " + f->nombre + " (" + std::to_string((int)registradas.size()) + "/" + std::to_string(totalEspecies) + ")", glm::vec3(0.55f, 0.95f, 1.0f), 3.5f);
+        if ((int)registradas.size() == totalEspecies)
+            Aviso("¡Álbum completo! Fotografiaste todas las especies del arrecife.", glm::vec3(0.5f, 1.0f, 0.6f), 7.0f);
+    }
 
     void Aviso(const std::string& texto, glm::vec3 color, float segundos)
     {

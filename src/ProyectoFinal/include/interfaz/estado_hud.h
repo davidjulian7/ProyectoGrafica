@@ -32,6 +32,12 @@ const int NUM_NIVELES = 3;
 const float PISTA_DISTANCIA_INTERMEDIO = 12.0f;   // intermedio: brillan los interactivos a menos de 12 m del buzo
 const float AYUDA_QUIETO_AVANZADO = 8.0f;         // avanzado: segundos quieto para que aparezcan las teclas
 
+// DIFICULTAD POR TIEMPO: segundos para completar cada zona segun el nivel (basico 6:00, intermedio 4:00, avanzado 2:30)
+//   el reloj se ve arriba a la derecha (HUDCronometro) y al acabarse sale "Se acabó el tiempo" (HUDTiempoAgotado)
+//   la cuenta esta en ProyectoFinal.cpp → Update() (tiempoUsado)
+// [CAMBIAR] tiempos de cada nivel en segundos
+const float TIEMPO_NIVEL[NUM_NIVELES] = { 360.0f, 240.0f, 150.0f };
+
 struct EstadoHUD
 {
     bool detallado = false;
@@ -42,6 +48,7 @@ struct EstadoHUD
     float quieto = 0.0f;
 };
 inline EstadoHUD& HUD() { static EstadoHUD h; return h; }
+inline float TiempoLimite() { return TIEMPO_NIVEL[HUD().nivel]; }
 
 inline const char* NombreNivel(int n)
 {

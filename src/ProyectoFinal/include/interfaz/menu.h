@@ -431,6 +431,12 @@ public:
     float Alto() const { return fbH; }
     void Rect(glm::vec4 r, glm::vec4 color, float radio = 0.0f) { DibujarColor(r, color, radio, 1.0f); }
     void Resplandor(glm::vec4 r, glm::vec4 color, float radio, float pad) { DibujarBrillo(r, color, radio, pad, 1.0f); }
+    // Imagen a partir de una textura de OpenGL (fotos del album: interfaz/album.h)
+    void Imagen(GLuint tex, int ancho, int alto, glm::vec4 r, float radio = 0.0f, float alpha = 1.0f)
+    {
+        MenuTextura t; t.id = tex; t.ancho = ancho; t.alto = alto;
+        DibujarImagen(t, r, radio, 0.0f, glm::vec4(0.0f), alpha, 1.0f);
+    }
 
     // Ancho en pixeles de un texto (UTF-8)
     float MedirTexto(const std::string& s, float tam, bool usarNegrita = true)

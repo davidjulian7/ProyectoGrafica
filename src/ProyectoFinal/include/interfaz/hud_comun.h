@@ -188,6 +188,46 @@ inline void HUDSiguienteZona(MenuInicio& ui, const std::string& texto, float res
     ui.Texto(b, W * 0.5f, y + 13 * s, 17 * s, glm::vec4(1.0f, 0.85f, 0.45f, 1.0f), 1);
 }
 
+// ============================================================================================
+// DIFICULTAD POR TIEMPO (interfaz/estado_hud.h → TIEMPO_NIVEL)
+// ============================================================================================
+// Reloj de la zona (arriba a la derecha, a la izquierda del termometro o de la barra de limpieza)
+//   restante: segundos que quedan · ocupado: ancho que ya usa otro panel en esa esquina
+inline void HUDCronometro(MenuInicio& ui, float restante, float t, float ocupado)
+{
+    if (restante < 0.0f) restante = 0.0f;
+    float s = ui.Escala(), W = ui.Ancho();
+    int seg = (int)ceilf(restante);
+    char b[16]; snprintf(b, sizeof(b), "%d:%02d", seg / 60, seg % 60);
+    // [CAMBIAR] colores: blanco, amarillo en el ultimo minuto y rojo (con pulso) en los ultimos 30 s
+    glm::vec3 c = restante <= 30.0f ? glm::vec3(1.0f, 0.45f, 0.4f) : (restante <= 60.0f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(0.92f, 0.97f, 1.0f));
+    float w = 128.0f * s, h = 40.0f * s, y = 18.0f * s;
+    float x = W - 18.0f * s - (ocupado > 0.0f ? ocupado + 12.0f * s : 0.0f) - w;
+    if (restante <= 30.0f) ui.Resplandor(glm::vec4(x - 8 * s, y - 8 * s, w + 16 * s, h + 16 * s), glm::vec4(c, 0.25f + 0.2f * sinf(t * 6.0f)), 12 * s, 10 * s);
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.62f), 12.0f * s);
+    ui.Texto("TIEMPO", x + 14 * s, y + 14 * s, 11 * s, glm::vec4(0.75f, 0.9f, 1.0f, 0.9f), 0);
+    ui.Texto(b, x + w - 14 * s, y + 8 * s, 21 * s, glm::vec4(c, 1.0f), 2);
+}
+
+// Se acabo el tiempo: Enter repite la zona, Esc vuelve al menu
+inline void HUDTiempoAgotado(MenuInicio& ui, const std::string& zona, float segundos)
+{
+    float a = segundos < 0.5f ? segundos / 0.5f : 1.0f;
+    float s = ui.Escala(), W = ui.Ancho(), H = ui.Alto();
+    ui.Rect(glm::vec4(0, 0, W, H), glm::vec4(0.25f, 0.02f, 0.02f, 0.45f * a));
+    float w = 540.0f * s, h = 190.0f * s, x = (W - w) * 0.5f, y = (H - h) * 0.42f;
+    glm::vec3 rojo(1.0f, 0.5f, 0.45f);
+    ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.06f, 0.10f, 0.94f * a), 18.0f * s);
+    ui.Rect(glm::vec4(x, y, w, 5.0f * s), glm::vec4(rojo, a), 2.0f * s);
+    ui.Texto("¡SE ACABÓ EL TIEMPO!", W * 0.5f, y + 22 * s, 34 * s, glm::vec4(rojo, a), 1);
+    ui.Texto(zona, W * 0.5f, y + 70 * s, 17 * s, glm::vec4(0.6f, 0.92f, 1.0f, a), 1);
+    int lim = (int)TiempoLimite();
+    char b[96]; snprintf(b, sizeof(b), "Nivel %s: tenías %d:%02d para completar la zona", NombreNivel(HUD().nivel), lim / 60, lim % 60);
+    ui.Texto(b, W * 0.5f, y + 100 * s, 15 * s, glm::vec4(0.92f, 0.95f, 1.0f, a), 1, false);
+    float pulso = 0.6f + 0.4f * sinf(segundos * 4.0f);
+    ui.Texto("Enter: intentar de nuevo   ·   Esc: volver al menú", W * 0.5f, y + h - 42 * s, 16 * s, glm::vec4(1.0f, 0.85f, 0.45f, a * pulso), 1);
+}
+
 // Pista discreta de teclas de informacion (abajo a la derecha)
 // Nivel avanzado: solo aparece si el buzo se queda quieto (o con los paneles de H abiertos).
 inline void HUDPistaTeclas(MenuInicio& ui)

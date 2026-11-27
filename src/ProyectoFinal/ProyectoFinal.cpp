@@ -370,7 +370,21 @@ bool Update() {
 
 	// Nado del buzo (teclado) y animaciones de la zona (burbujas)
 	if (HUD().intro) HUD().introTiempo += deltaTime;
-	if (!inspeccion && !HUD().intro && !tiempoAgotado) processInput(window);
+	if (!inspeccion && !HUD().intro && !tiempoAgotado && !Album().abierto) processInput(window);
+	// Album abierto (tecla L): aparece el cursor para dar clic en las fotos; al cerrarlo vuelve la mira
+	{
+		static bool cursorAlbum = false;
+		if (Album().abierto != cursorAlbum) {
+			cursorAlbum = Album().abierto;
+			if (estadoActual != MENU) glfwSetInputMode(window, GLFW_CURSOR, cursorAlbum ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+			firstMouse = true;
+		}
+		if (cursorAlbum) {
+			double cx, cy; int winW, winH, fbAncho, fbAlto;
+			glfwGetCursorPos(window, &cx, &cy); glfwGetWindowSize(window, &winW, &winH); glfwGetFramebufferSize(window, &fbAncho, &fbAlto);
+			Album().cursor = glm::vec2((float)cx * fbAncho / (float)(winW > 0 ? winW : 1), (float)cy * fbAlto / (float)(winH > 0 ? winH : 1));
+		}
+	}
 	// Nivel de uso avanzado: cuenta cuanto tiempo lleva el buzo sin nadar (el raton y las teclas lo reinician)
 	if (HUD().intro || glm::length(diverVelocity) > 0.3f) HUD().quieto = 0.0f;
 	else HUD().quieto += deltaTime;
@@ -399,7 +413,7 @@ bool Update() {
 	if (!HUD().intro && !tiempoAgotado && !recorridoTerminado && !MisionCumplida()) {
 		tiempoUsado += dtEscena;
 		if (tiempoUsado >= TiempoLimite()) {
-			tiempoAgotado = true; tAgotado = 0.0f; Album().abierto = false;
+			tiempoAgotado = true; tAgotado = 0.0f; Album().Cerrar();
 			Efecto("sound/alerta.wav", 0.6f);
 			std::cout << ">> Se acabo el tiempo (Enter: intentar de nuevo, Esc: menu)" << std::endl;
 		}
@@ -494,11 +508,10 @@ bool Update() {
 	// Nivel de uso: teclas en el borde (basico/intermedio siempre, avanzado solo si el buzo se queda quieto)
 	if (!HUD().intro && !recorridoTerminado && tSiguiente < 0.0f && !inspeccion && !tiempoAgotado)
 		HUDTeclasBorde(menuInicio, TeclasZona());
-	// Dificultad: reloj de la zona (a la izquierda del termometro o de la barra de limpieza)
-	if (!HUD().intro && !recorridoTerminado && !tiempoAgotado && !MisionCumplida() && !inspeccion) {
-		float ocupado = HUD().detallado ? 0.0f : (estadoActual == NAUFRAGIOS ? 200.0f : 74.0f) * menuInicio.Escala();
-		HUDCronometro(menuInicio, TiempoLimite() - tiempoUsado, animTime, ocupado);
-	}
+	// Dificultad: reloj de la zona (arriba al centro)
+	if (!HUD().intro && !recorridoTerminado && !tiempoAgotado && !MisionCumplida() && !inspeccion)
+		HUDCronometro(menuInicio, TiempoLimite() - tiempoUsado, animTime);
+	HUD().objetivoDerecha = 0.0f;   // lo vuelve a escribir HUDObjetivo en el siguiente cuadro
 	if (tiempoAgotado) {
 		const char* zonas[] = { "", "Zona 1 · Arrecifes", "Zona 2 · Aguas Frías", "Zona 3 · Naufragios" };
 		HUDTiempoAgotado(menuInicio, zonas[estadoActual], tAgotado);
@@ -680,6 +693,10 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 		return;
 	}
 	if (recorridoTerminado || tiempoAgotado) return;
+	if (Album().abierto) {                               // album: clic en una foto la ve en grande
+		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) Album().Clic();
+		return;
+	}
 	if (estadoActual == ARRECIFES && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !escenario.modoEdicion) {
 		if (escenario.InspeccionActiva()) escenario.CerrarInspeccion();
 		else escenario.AbrirInspeccion();
@@ -725,6 +742,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		firstMouse = true;
 		return;
 	}
+	if (Album().abierto) { firstMouse = true; return; }   // el cursor se usa para elegir fotos
 	if (estadoActual == ARRECIFES && escenario.InspeccionActiva()) {
 		if (firstMouse) {
 			lastX = (float)xpos; lastY = (float)ypos; firstMouse = false;
@@ -815,6 +833,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	// Zona completada: Enter pasa a la siguiente sin esperar
 	if ((key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) && tSiguiente >= 0.0f) { AvanzarRecorrido(); return; }
 	HUD().quieto = 0.0f;   // cualquier tecla cuenta como actividad (nivel avanzado)
+	// Album abierto: Esc regresa de la foto grande o cierra el album · L lo cierra · ← → cambian de foto
+	if (Album().abierto) {
+		if (key == GLFW_KEY_ESCAPE) { if (Album().vista >= 0) Album().vista = -1; else Album().Cerrar(); return; }
+		if (key == GLFW_KEY_L) { Album().Cerrar(); return; }
+		if (key == GLFW_KEY_LEFT || key == GLFW_KEY_A) { Album().Mover(-1); return; }
+		if (key == GLFW_KEY_RIGHT || key == GLFW_KEY_D) { Album().Mover(1); return; }
+	}
 	// Nivel de uso: U cambia Basico -> Intermedio -> Avanzado sin salir de la zona (interfaz/estado_hud.h)
 	if (key == GLFW_KEY_U) {
 		HUD().nivel = (HUD().nivel + 1) % NUM_NIVELES;
@@ -971,7 +996,7 @@ void AvanzarRecorrido()
 void VolverAlMenu()
 {
 	HUD().intro = false; tSiguiente = -1.0f; recorridoTerminado = false; tiempoAgotado = false;
-	Album().abierto = false;
+	Album().Cerrar();
 	estadoActual = MENU;
 	menuInicio.Reiniciar();
 	Ambiente("sound/ambiente_arrecife.wav", silencio ? 0.0f : 0.25f);   // ambiente suave en el menú

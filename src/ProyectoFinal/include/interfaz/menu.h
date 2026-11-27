@@ -383,7 +383,7 @@ public:
                                              : Lineas("Modelo del arrecife seleccionado para observar sus formas y materiales.", w - 2.0f * pad, 15.0f * s, false);
         std::vector<std::string> extra = detalle.empty() ? std::vector<std::string>() : Lineas(detalle, w - 2.0f * pad, 13.0f * s, false);
         float h = pad * 2.0f + 18.0f * s + 34.0f * s + 22.0f * s + dato.size() * 19.0f * s
-                + extra.size() * 17.0f * s + 58.0f * s;
+                + extra.size() * 17.0f * s + 26.0f * s;
         float x = 22.0f * s, y = (fbH - h) * 0.5f;
         DibujarColor(glm::vec4(0.0f, 0.0f, fbW, fbH), glm::vec4(0.0f, 0.025f, 0.05f, 0.58f), 0.0f, 1.0f);
         DibujarColor(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.94f), 14.0f * s, 1.0f);
@@ -395,7 +395,6 @@ public:
         if (ficha) { Texto(ficha->estado, x + pad, ty, 14.0f * s, glm::vec4(0.9f, 0.78f, 0.48f, 1.0f), 0, false); ty += 22.0f * s; }
         for (const std::string& linea : dato) { Texto(linea, x + pad, ty, 15.0f * s, glm::vec4(0.94f, 0.96f, 0.98f, 1.0f), 0, false); ty += 19.0f * s; }
         for (const std::string& linea : extra) { Texto(linea, x + pad, ty + 4.0f * s, 13.0f * s, glm::vec4(colorDetalle, 1.0f), 0, false); ty += 17.0f * s; }
-        Texto("MODELO: " + modelo + ".fbx", x + pad, y + h - 34.0f * s, 12.0f * s, glm::vec4(0.68f, 0.78f, 0.82f, 1.0f), 0, false);
         float cx = fbW * 0.70f;
         Texto("Mueve el raton para rotar", cx, fbH - 78.0f * s, 15.0f * s, glm::vec4(1.0f), 1);
         Texto("Rueda: acercar / alejar   ·   Clic o Esc: cerrar", cx, fbH - 52.0f * s, 13.0f * s, glm::vec4(0.8f, 0.9f, 0.94f, 1.0f), 1, false);

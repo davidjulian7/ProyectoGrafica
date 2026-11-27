@@ -129,6 +129,24 @@ inline void Escenario::ConstruirNaufragios()
         else if (b.archivo == "botella") { b.alpha = 0.65f; MatTraslucido(b); b.fantasma = 0.15f; }
         else MatPlastico(b);
     }
+    // Primera vista al entrar: frente al letrero de plasticos va una botella (no una lata).
+    // La lata mas cercana al letrero cambia de lugar con la botella del fondo mas lejana al punto de inicio del buzo.
+    // [CAMBIAR] cerca = posicion (x, z) del letrero de plasticos
+    {
+        glm::vec2 cerca(6.5f, 9.0f);
+        int iLata = -1, iBotella = -1; float dLata = 1e9f, dBotella = -1.0f;
+        for (size_t i = ini; i < elementos.size(); i++) {
+            const Elemento& b = elementos[i];
+            float d = glm::length(glm::vec2(b.pos.x, b.pos.z) - cerca);
+            float dInicio = glm::length(glm::vec2(b.pos.x - cfg.inicioCamara.x, b.pos.z - cfg.inicioCamara.z));
+            if (b.archivo == "lata" && d < dLata) { dLata = d; iLata = (int)i; }
+            if (b.archivo == "botella" && b.mov == MOV_FIJO && dInicio > dBotella) { dBotella = dInicio; iBotella = (int)i; }
+        }
+        if (iLata >= 0 && iBotella >= 0) {
+            glm::vec3& pl = elementos[iLata].pos; glm::vec3& pb = elementos[iBotella].pos;
+            std::swap(pl.x, pb.x); std::swap(pl.z, pb.z);
+        }
+    }
     Elemento bolsaKF = fijo("bolsaplastico", glm::vec3(0.0f), 0, 1.0f, "Bolsa de plastico");   // KF de Julian: recorre puntos de flotacion
     bolsaKF.mov = MOV_KF; bolsaKF.kf = &KF_Bolsa(); bolsaKF.escala = 1.5f; bolsaKF.basura = true; bolsaKF.residuo = 1; bolsaKF.alpha = 0.55f; MatTraslucido(bolsaKF);
     elementos.push_back(bolsaKF);

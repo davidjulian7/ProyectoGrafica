@@ -46,6 +46,7 @@ struct EstadoHUD
     float introTiempo = 0.0f;
     int nivel = NIVEL_BASICO;     // [CAMBIAR] nivel con el que arranca el juego
     float quieto = 0.0f;
+    float objetivoDerecha = 0.0f; // borde derecho del panel de objetivo (el reloj se recorre para no encimarse)
 };
 inline EstadoHUD& HUD() { static EstadoHUD h; return h; }
 inline float TiempoLimite() { return TIEMPO_NIVEL[HUD().nivel]; }

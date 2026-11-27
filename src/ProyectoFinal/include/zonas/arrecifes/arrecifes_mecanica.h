@@ -163,14 +163,11 @@ public:
     // Texto de estado para la ficha de un coral
     std::string Detalle(const Elemento& e, glm::vec3& color) const
     {
-        const Ficha* f = BuscarFicha(e.etiqueta);
-        std::string foto = (f && f->bitacora && !registradas.count(e.etiqueta)) ? "X: foto" : "";
-        if (!e.esCoral) { if (!foto.empty()) color = glm::vec3(1.0f, 0.85f, 0.6f); return foto; }
-        std::string extra = foto.empty() ? "" : "  ·  " + foto;
+        if (!e.esCoral) return "";
         char b[64];
-        if (e.muerte > 0.5f) { color = glm::vec3(1.0f, 0.5f, 0.45f); return "Estado: muerto, cubierto de algas" + extra; }
-        if (e.blanqueo > 0.15f) { color = glm::vec3(1.0f, 0.8f, 0.5f); snprintf(b, sizeof(b), "Estado: blanqueado %d%%", (int)(e.blanqueo * 100.0f + 0.5f)); return b + extra; }
-        color = glm::vec3(0.5f, 1.0f, 0.6f); return "Estado: sano" + extra;
+        if (e.muerte > 0.5f) { color = glm::vec3(1.0f, 0.5f, 0.45f); return "Estado: muerto, cubierto de algas"; }
+        if (e.blanqueo > 0.15f) { color = glm::vec3(1.0f, 0.8f, 0.5f); snprintf(b, sizeof(b), "Estado: blanqueado %d%%", (int)(e.blanqueo * 100.0f + 0.5f)); return b; }
+        color = glm::vec3(0.5f, 1.0f, 0.6f); return "Estado: sano";
     }
 
     // Indicaciones al entrar a la zona (tarjeta inicial)

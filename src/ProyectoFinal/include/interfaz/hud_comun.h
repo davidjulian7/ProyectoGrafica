@@ -139,6 +139,7 @@ inline void HUDObjetivo(MenuInicio& ui, const std::string& textoObjetivo, int he
     char b[32]; snprintf(b, sizeof(b), "%d/%d", hechos, total);
     float tw = ui.MedirTexto(texto, 15.0f * s, true);
     float w = tw + 96.0f * s, h = extra.empty() ? 38.0f * s : 58.0f * s, x = 18.0f * s, y = 18.0f * s;
+    HUD().objetivoDerecha = x + w;
     ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.62f), 12.0f * s);
     ui.Texto(b, x + 14 * s, y + 10 * s, 15 * s, glm::vec4(0.55f, 0.9f, 1.0f, 1.0f), 0);
     ui.Texto(texto, x + 62 * s, y + 10 * s, 15 * s, glm::vec4(1.0f), 0, true);
@@ -191,9 +192,9 @@ inline void HUDSiguienteZona(MenuInicio& ui, const std::string& texto, float res
 // ============================================================================================
 // DIFICULTAD POR TIEMPO (interfaz/estado_hud.h → TIEMPO_NIVEL)
 // ============================================================================================
-// Reloj de la zona (arriba a la derecha, a la izquierda del termometro o de la barra de limpieza)
-//   restante: segundos que quedan · ocupado: ancho que ya usa otro panel en esa esquina
-inline void HUDCronometro(MenuInicio& ui, float restante, float t, float ocupado)
+// Reloj de la zona (arriba al centro; si el objetivo es muy largo se recorre a su derecha)
+//   restante: segundos que quedan
+inline void HUDCronometro(MenuInicio& ui, float restante, float t)
 {
     if (restante < 0.0f) restante = 0.0f;
     float s = ui.Escala(), W = ui.Ancho();
@@ -202,11 +203,13 @@ inline void HUDCronometro(MenuInicio& ui, float restante, float t, float ocupado
     // [CAMBIAR] colores: blanco, amarillo en el ultimo minuto y rojo (con pulso) en los ultimos 30 s
     glm::vec3 c = restante <= 30.0f ? glm::vec3(1.0f, 0.45f, 0.4f) : (restante <= 60.0f ? glm::vec3(1.0f, 0.8f, 0.35f) : glm::vec3(0.92f, 0.97f, 1.0f));
     float w = 128.0f * s, h = 40.0f * s, y = 18.0f * s;
-    float x = W - 18.0f * s - (ocupado > 0.0f ? ocupado + 12.0f * s : 0.0f) - w;
+    float x = (W - w) * 0.5f;
+    if (x < HUD().objetivoDerecha + 12.0f * s) x = HUD().objetivoDerecha + 12.0f * s;
     if (restante <= 30.0f) ui.Resplandor(glm::vec4(x - 8 * s, y - 8 * s, w + 16 * s, h + 16 * s), glm::vec4(c, 0.25f + 0.2f * sinf(t * 6.0f)), 12 * s, 10 * s);
     ui.Rect(glm::vec4(x, y, w, h), glm::vec4(0.01f, 0.07f, 0.12f, 0.62f), 12.0f * s);
-    ui.Texto("TIEMPO", x + 14 * s, y + 14 * s, 11 * s, glm::vec4(0.75f, 0.9f, 1.0f, 0.9f), 0);
-    ui.Texto(b, x + w - 14 * s, y + 8 * s, 21 * s, glm::vec4(c, 1.0f), 2);
+    float cy = y + h * 0.5f;   // textos centrados en vertical dentro del recuadro
+    ui.Texto("TIEMPO", x + 14 * s, ui.YCentrada(cy, 11 * s), 11 * s, glm::vec4(0.75f, 0.9f, 1.0f, 0.9f), 0);
+    ui.Texto(b, x + w - 14 * s, ui.YCentrada(cy, 21 * s), 21 * s, glm::vec4(c, 1.0f), 2);
 }
 
 // Se acabo el tiempo: Enter repite la zona, Esc vuelve al menu

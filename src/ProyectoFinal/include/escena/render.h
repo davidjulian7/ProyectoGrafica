@@ -169,7 +169,11 @@ inline void Escenario::DibujarInspeccion(const glm::mat4& proj, const glm::mat4&
     rotacion = glm::rotate(rotacion, glm::radians(inclinacionInspeccion), cam.Right);
     float diametro = 2.0f * e.radioBase * e.escala;
     float ajuste = 2.2f / (diametro > 0.05f ? diametro : 0.05f);
-    glm::vec3 centro = cam.Position + cam.Front * 3.8f + cam.Up * 0.05f;
+    // el modelo se recorre a la derecha para que la ficha (a la izquierda) no lo tape
+    // [CAMBIAR] posicion horizontal en pantalla: -1 izquierda, 0 centro, 1 derecha (0.40 = 70% del ancho)
+    const float xPantalla = 0.40f;
+    float lado = proj[3][3] > 0.5f ? xPantalla / proj[0][0] : xPantalla * 3.8f / proj[0][0];
+    glm::vec3 centro = cam.Position + cam.Front * 3.8f + cam.Up * 0.05f + cam.Right * lado;
     glm::mat4 modelo = glm::translate(glm::mat4(1.0f), centro) * rotacion
                      * glm::mat4(glm::mat3(pose)) * glm::scale(glm::mat4(1.0f), glm::vec3(ajuste * zoomInspeccion));
     sh->setMat4("model", modelo);
